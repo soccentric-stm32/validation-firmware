@@ -20,7 +20,8 @@
  * when no other owner is active. */
 typedef enum {
     PIN_OWNER_FREE = 0,      /* drivable by the GPIO/pin tests            */
-    PIN_OWNER_CONSOLE,       /* USART3 VCP (CON-005: PD8/PD9)             */
+    PIN_OWNER_CONSOLE,       /* USART3 VCP (CON-005: PD8/PD9), USART6 debug
+                              * (DUART-004: PG14/PG9)                    */
     PIN_OWNER_SWDBG,         /* PA13/PA14 SWD, PH0/PH1 HSE (CON-005)      */
     PIN_OWNER_LED,           /* PB0/PB7/PB14 board LEDs                   */
     PIN_OWNER_BTN,           /* PC13 B1                                   */

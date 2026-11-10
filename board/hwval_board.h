@@ -34,6 +34,21 @@
 #define HWVAL_FLASH_END         0x08200000U
 #define HWVAL_OTP_BASE          0x1FF0F000U /* SAFE-002: MPU read-only      */
 
+/* --- RTC backup registers ------------------------------------------------- */
+/* RTC_BKP0R..BKP3R belong to the bootloader (SRS-BOOT-F767: trial state,
+ * "stay in BOOT" request, hand-over record, last boot outcome) and BKP7R is
+ * the link-mode flag (LINK-010).  The post-reset bootcheck (TFW-007) uses
+ * BKP8R..BKP13R so a resetting test never corrupts BOOT's trial state. */
+#define HWVAL_BKP_BOOT_FIRST    0U          /* BKP0R..BKP3R: BOOT only     */
+#define HWVAL_BKP_BOOT_COUNT    4U
+#define HWVAL_BKP_LINK_INDEX    7U          /* BKP7R: link-mode flag       */
+#define HWVAL_BKP_CHECK_MAGIC   (RTC->BKP8R)  /* bootcheck armed magic     */
+#define HWVAL_BKP_CHECK_HASH    (RTC->BKP9R)  /* case id hash              */
+#define HWVAL_BKP_CHECK_EXPECT  (RTC->BKP10R) /* expected verdict          */
+#define HWVAL_BKP_CHECK_ARG0    (RTC->BKP11R) /* per-case argument         */
+#define HWVAL_BKP_CHECK_ARG1    (RTC->BKP12R) /* per-case argument         */
+#define HWVAL_BKP_RESET_FLAGS   (RTC->BKP13R) /* RCC_CSR mirror at boot    */
+
 /* --- RAM layout (RM0410, Hardware.md section 4) --------------------------- */
 #define HWVAL_ITCMRAM_BASE      0x00000000U
 #define HWVAL_ITCMRAM_SIZE      (16U * 1024U)

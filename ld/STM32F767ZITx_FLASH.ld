@@ -7,9 +7,11 @@
  *          SRAM2 16 KB), NUCLEO-F767ZI
  * SRS:     GEN-006, GEN-007, TFW-022, ASM-004, NFR-004
  *
- * Flash sectors (RM0410): 0-3 = 32 KB each, 4 = 128 KB, 5-11 = 256 KB each.
- * Sector 11 (0x081C0000..0x081FFFFF) is deliberately not part of the FLASH
- * region: it stays free for the destructive flash tests (FLS-005).
+ * HWVAL runs as a slot image under the A/B bootloader (SRS-BOOT-F767
+ * LAY-002): it is linked at the slot offset 0x0800C000 and BOOT maps the
+ * active bank at 0x08000000, so the same image runs from slot A and slot B.
+ * The board stays in dual-bank mode, so the destructive single-bank sector-11
+ * flash tests report WRONG_FLASH_MODE (SAFE-011) and never erase a slot.
  */
 
 ENTRY(Reset_Handler)
@@ -19,8 +21,8 @@ _estack = ORIGIN(DTCMRAM) + LENGTH(DTCMRAM);
 
 MEMORY
 {
-    /* Sectors 0-10 only: 512 KiB * 3.5 = 1792 KiB (GEN-006, NFR-003). */
-    FLASH   (rx)  : ORIGIN = 0x08000000, LENGTH = 1792K
+    /* One bootloader slot: 976 KiB from 0x0800C000 (LAY-002). */
+    FLASH   (rx)  : ORIGIN = 0x0800C000, LENGTH = 976K
     DTCMRAM (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
     /* SRAM1 minus the 64 KiB .noinit block at its tail. */
     SRAM1   (rwx) : ORIGIN = 0x20020000, LENGTH = 304K
@@ -165,12 +167,13 @@ SECTIONS
 }
 
 /* GEN-006: the whole image (including the .data load image) stays inside
- * sectors 0-10. The build fails otherwise. */
+ * the bootloader slot. The build fails otherwise. */
+__flash_image_start = ORIGIN(FLASH);
 __flash_image_end = LOADADDR(.data) + SIZEOF(.data);
-ASSERT(ORIGIN(FLASH) + LENGTH(FLASH) == 0x081C0000,
-       "GEN-006: FLASH region must end exactly at the sector-11 boundary")
-ASSERT(__flash_image_end <= 0x081C0000,
-       "GEN-006: image overlaps flash sector 11 (reserved, ASM-004)")
+ASSERT(ORIGIN(FLASH) == 0x0800C000,
+       "GEN-006: the image must be linked at the bootloader slot offset")
+ASSERT(__flash_image_end <= ORIGIN(FLASH) + LENGTH(FLASH),
+       "GEN-006: image does not fit the bootloader slot")
 ASSERT(_edata - _sdata + (_ebss - _sbss) + _Min_Stack_Size <= LENGTH(DTCMRAM),
        "DTCM overflow")
 ASSERT(__sram1_end <= ORIGIN(NOINIT),

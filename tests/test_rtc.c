@@ -488,7 +488,14 @@ static tfw_result_t rtc_backup_regs(struct tfw_out *o)
     SET_BIT(PWR->CR1, PWR_CR1_DBP);
     rtc_unlock();
 
+    /* BKP0R..BKP3R hold the bootloader's trial state and hand-over, and
+     * BKP7R/BKP8R.. the link flag and bootcheck: save all 32 and restore
+     * them after the pattern check so the test leaves no trace. */
+    uint32_t saved[32];
     int bad = 0;
+    for (uint32_t i = 0U; i < 32U; i++) {
+        saved[i] = (&RTC->BKP0R)[i];
+    }
     for (uint32_t i = 0U; i < 32U; i++) {
         (&RTC->BKP0R)[i] = 0xB1000000U + i * 0x01010101U;
     }
@@ -498,22 +505,18 @@ static tfw_result_t rtc_backup_regs(struct tfw_out *o)
             bad++;
         }
     }
-    uint32_t marker_ok = (RTC->BKP0R >> 24U) == 0xB1U;
+    for (uint32_t i = 0U; i < 32U; i++) {
+        (&RTC->BKP0R)[i] = saved[i];
+    }
+    __DSB();
 
     if (bad == 0U) {
-        /* mark all 32 with the pattern; bootcheck 0x5E01 verifies after a
-         * system reset (backup regs survive) */
-        RTC->BKP0R = 0x5A5AA5A5U; /* marker handled below via reserved reg */
-        /* pattern preserved through the reset check */
-        hwval_meas(o, "32 regs pattern-write ok; marker=%lu",
-                   (unsigned long)marker_ok);
+        hwval_meas(o, "32 regs pattern-write ok, contents restored");
     } else {
         hwval_meas(o, "bad regs=%lu", (unsigned long)bad);
     }
-    hwval_lim(o, "write/read all 32; survived reset verified by bootcheck "
-                 "0x5E01 when the RST.002-style reset is used");
+    hwval_lim(o, "write/read all 32, then restore (BOOT owns BKP0R..BKP3R)");
     rtc_lock();
-    (void)marker_ok;
     if (bad != 0U) {
         hwval_fail(o, "%lu backup registers mismatch", (unsigned long)bad);
         return TFW_FAIL;

@@ -18,12 +18,13 @@
 #include "reset_cause.h"
 #include "settings.h"
 #include "cli.h"
+#include "debug_uart.h"
 
 /* -------------------------------------------------- RST-001 ------------ */
 static tfw_result_t rst_flags_boot(struct tfw_out *o)
 {
     /* On boot the flags were reported and cleared (GEN-010); the snapshot
-     * is mirrored to RTC BKPR5 by hwval_reset_cause_report(). */
+     * is mirrored to RTC BKP13R by hwval_reset_cause_report(). */
     uint32_t snap = hwval_reset_flags_snapshot();
     uint32_t live = RCC->CSR & 0xFE000000U; /* reset flag bits only */
 
@@ -107,7 +108,7 @@ static struct {
     { (void *)&DMA2_Stream0->NDTR, 0x00000000U, (void *)&RCC->AHB1RSTR, RCC_AHB1RSTR_DMA2RST },
 };
 
-static tfw_result_t rst_peripheral_reset(struct tfw_out *o)
+static tfw_result_t rst_peripheral_reset_run(struct tfw_out *o)
 {
     int bad = 0;
     unsigned n = (unsigned)(sizeof(k_rst_checks) / sizeof(k_rst_checks[0]));
@@ -138,8 +139,8 @@ static void iwdg_arm_bootcheck(uint32_t hash, uint32_t expect_s)
 {
     hwval_bootcheck_arm(hash, TFW_PASS);
     RTC->WPR = 0xCAU; RTC->WPR = 0x53U;
-    RTC->BKP3R = RTC->TR;     /* armed at this calendar second */
-    RTC->BKP4R = expect_s;    /* timeout to verify after reset  */
+    HWVAL_BKP_CHECK_ARG0 = RTC->TR;  /* armed at this calendar second */
+    HWVAL_BKP_CHECK_ARG1 = expect_s; /* timeout to verify after reset  */
     RTC->WPR = 0xFFU;
 }
 
@@ -238,6 +239,16 @@ static tfw_result_t wdg_dbg_freeze(struct tfw_out *o)
     CLEAR_BIT(DBGMCU->APB1FZ, DBGMCU_APB1_FZ_DBG_IWDG_STOP |
               DBGMCU_APB1_FZ_DBG_WWDG_STOP);
     return TFW_SKIP;
+}
+
+
+/* DUART-003: resets USART6 (the debug port); re-initialise it afterwards. */
+static tfw_result_t rst_peripheral_reset(struct tfw_out *o)
+{
+    hwval_dbg_pause();
+    tfw_result_t r = rst_peripheral_reset_run(o);
+    hwval_dbg_resume();
+    return r;
 }
 
 /* ----------------------------------------------------------------- table */

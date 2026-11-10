@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include "stm32f7xx_hal.h"
+#include "hwval_board.h"
 #include "reset_cause.h"
 #include "uart3.h"
 
@@ -65,10 +66,10 @@ void hwval_reset_cause_report(void)
     uint32_t flags = RCC->CSR; /* snapshot before clearing */
 
     s_flags_at_boot = flags;
-    /* mirror into RTC BKPR5 so bootcheck can see the causes that were set
+    /* mirror into RTC BKP13R so bootcheck can see the causes that were set
      * even after the flags are cleared (TFW-007) */
     RTC->WPR = 0xCAU; RTC->WPR = 0x53U;
-    RTC->BKP5R = flags;
+    HWVAL_BKP_RESET_FLAGS = flags;
     RTC->WPR = 0xFFU;
 
     char line[128];

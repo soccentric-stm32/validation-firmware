@@ -18,10 +18,12 @@
 #include "test_core.h"
 #include "cli.h"
 #include "uart3.h"
+#include "boot_slot.h"
 #include "fault.h"
 #include "version.h"
 #include "iwdg.h"
 #include "settings.h"
+#include "debug_uart.h"
 
 static void hwval_panic_report(void);
 
@@ -133,6 +135,9 @@ void hwval_rtos_start(void)
     if (xTaskCreate(task_watchdog, "wdg", 256, NULL, 1, NULL) != pdPASS) {
         configASSERT(!"create wdg");
     }
+    if (hwval_dbg_task_create() != 0) {   /* DUART-002 */
+        configASSERT(!"create dbg");
+    }
     hwval_dwt_stats_init();
     vTaskStartScheduler();
 
@@ -142,10 +147,15 @@ void hwval_rtos_start(void)
 
 /* Runner: executes the boot suite once, then jobs submitted by the CLI or
  * link mode (section 7 / LINK-005).  In link mode the boot suite is skipped
- * so the GUI owns the test schedule. */
+ * so the GUI owns the test schedule.  While BOOT runs this slot on trial no
+ * test may run: several reset the MCU, which BOOT would count as a failed
+ * trial.  Jobs submitted meanwhile wait until the slot is confirmed. */
 static void task_runner(void *arg)
 {
     (void)arg;
+    while (hwval_boot_trial_pending()) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
     if (g_set.mode != HWVAL_MODE_LINK) {
         hwval_test_all();
     }
@@ -178,14 +188,16 @@ static void task_heartbeat(void *arg)
 /* Watchdog (FRT-013 + GEN-009): dedicated lowest-priority task refreshes
  * IWDG while the Runner shows progress. If the Runner hangs longer than
  * the current test's timeout + 5 s, stop kicking: IWDG resets the MCU and
- * the boot path reports it. */
+ * the boot path reports it.  It also runs the BOOT trial health check; a
+ * failed check stops the kicks so BOOT counts a failed trial. */
 static void task_watchdog(void *arg)
 {
     (void)arg;
     const TickType_t period = pdMS_TO_TICKS(500);
 
     for (;;) {
-        if (!hwval_test_runner_progress_expired()) {
+        hwval_boot_health_poll();
+        if (!hwval_test_runner_progress_expired() && !hwval_boot_stop_kick()) {
             hwval_iwdg_kick();
         }
         vTaskDelay(period);

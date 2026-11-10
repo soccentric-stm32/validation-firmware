@@ -107,9 +107,12 @@ static tfw_result_t core_fpu(struct tfw_out *o)
 }
 
 /* --------------------------- fault tests shared setup (CORE-003..006) -- */
+/* Enable the configurable fault handlers.  The DIV_0/UNALIGN traps are set
+ * only by the test that needs one and cleared on recovery, before any
+ * library call: newlib's printf makes unaligned accesses, so a trap left on
+ * turns the next hwval_meas() into a real fault. */
 static void fault_arming(void)
 {
-    SCB->CCR |= SCB_CCR_DIV_0_TRP_Msk | SCB_CCR_UNALIGN_TRP_Msk;
     SCB->SHCSR |= SCB_SHCSR_USGFAULTENA_Msk | SCB_SHCSR_BUSFAULTENA_Msk |
                   SCB_SHCSR_MEMFAULTENA_Msk;
 }
@@ -120,13 +123,17 @@ static tfw_result_t core_div0(struct tfw_out *o)
     uint32_t q;
 
     fault_arming();
+    SCB->CCR |= SCB_CCR_DIV_0_TRP_Msk;
     /* cppcheck-suppress assignBoolToPointer */ hwval_fault_recover_pc = (void *)&&recover;
     hwval_fault_recover = 1;
     __asm volatile ("udiv %0, %1, %2" : "=r"(q) : "r"(1U), "r"(0U));
+    HWVAL_FAULT_RECOVER_POINT(recover);
+    SCB->CCR &= ~SCB_CCR_DIV_0_TRP_Msk;
     hwval_fail(o, "udiv 1/0 did not fault");
     goto done;
 
 recover:
+    SCB->CCR &= ~SCB_CCR_DIV_0_TRP_Msk;
     if (hwval_fault_last_exc != 6U) { /* UsageFault */
         hwval_fail(o, "expected UsageFault, got exc %lu",
                    (unsigned long)hwval_fault_last_exc);
@@ -157,12 +164,15 @@ static tfw_result_t core_unaligned(struct tfw_out *o)
     SCB->CCR |= SCB_CCR_UNALIGN_TRP_Msk;
     /* cppcheck-suppress assignBoolToPointer */ hwval_fault_recover_pc = (void *)&&trapped;
     hwval_fault_recover = 1;
-    v = *mis;
+    v = *(volatile const uint32_t *)mis;   /* volatile: must not be elided */
+    HWVAL_FAULT_RECOVER_POINT(trapped);
     (void)v;                 /* only reached if the trap failed */
+    SCB->CCR &= ~SCB_CCR_UNALIGN_TRP_Msk;
     hwval_fail(o, "unaligned read did not trap");
     goto done;
 
 trapped:
+    SCB->CCR &= ~SCB_CCR_UNALIGN_TRP_Msk;
     if (hwval_fault_last_exc != 6U) {
         hwval_fail(o, "expected UsageFault, got %lu",
                    (unsigned long)hwval_fault_last_exc);
@@ -195,6 +205,7 @@ static tfw_result_t core_busfault(struct tfw_out *o)
     /* cppcheck-suppress assignBoolToPointer */ hwval_fault_recover_pc = (void *)&&recover;
     hwval_fault_recover = 1;
     s_bus_probe = *(volatile const uint32_t *)0x24F00000U; /* reserved */
+    HWVAL_FAULT_RECOVER_POINT(recover);
     hwval_fail(o, "reserved read did not busfault");
     goto done;
 
@@ -225,6 +236,7 @@ static tfw_result_t core_undefinstr(struct tfw_out *o)
     /* cppcheck-suppress assignBoolToPointer */ hwval_fault_recover_pc = (void *)&&recover;
     hwval_fault_recover = 1;
     __asm volatile (".word 0xDE01\n"); /* UDF #1 */
+    HWVAL_FAULT_RECOVER_POINT(recover);
     hwval_fail(o, "UDF did not fault");
     goto done;
 
@@ -279,7 +291,8 @@ static tfw_result_t core_svc_pendsv_nmi(struct tfw_out *o)
     /* SVC: invoking SVC under a running scheduler would make the port
      * handler restart the first task, so verify the vector instead. */
     extern void vPortSVCHandler(void);
-    uint32_t svc_vec = *(const uint32_t *)(0x08000000U + 11U * 4U);
+    /* The table is at the bootloader slot, not 0x08000000 (BOOT's own). */
+    uint32_t svc_vec = *(const uint32_t *)(SCB->VTOR + 11U * 4U);
     if ((uint32_t)(uintptr_t)vPortSVCHandler != svc_vec) {
         hwval_fail(o, "SVC vector %08lX != vPortSVCHandler",
                    (unsigned long)svc_vec);
@@ -359,10 +372,13 @@ static tfw_result_t core_benchmark(struct tfw_out *o)
 
     /* ITCM copy: the function code bytes into zero-wait-state ITCM RAM */
     uint32_t fn_len = 256U; /* fixed window large enough for this fn */
-    memcpy(itcm, (const void *)((uintptr_t)fn_flash), fn_len);
+    /* A Thumb function pointer has bit 0 set: copy from the real code
+     * address, and call the copy with bit 0 set, or BLX faults INVSTATE. */
+    memcpy(itcm, (const void *)((uintptr_t)fn_flash & ~1U), fn_len);
     __DSB();
     __DMB(); /* ITCM is not cached; barrier only */
-    bench_fn_t fn_itcm = (bench_fn_t)(void *)hwval_itcm_base;
+    __ISB(); /* fetch the freshly written code */
+    bench_fn_t fn_itcm = (bench_fn_t)((uintptr_t)hwval_itcm_base | 1U);
 
     /* flash cached */
     DWT->CYCCNT = 0U;

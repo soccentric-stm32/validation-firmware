@@ -16,12 +16,14 @@
 #include "task.h"
 #include "semphr.h"
 #include "stm32f7xx_hal.h"
+#include "hwval_board.h"
 #include "test_core.h"
 #include "uart3.h"
 #include "settings.h"
 #include "hwval_sections.h"
 #include "cli.h"
 #include "version.h"
+#include "debug_uart.h"
 
 #define HWVAL_MAX_TESTS 256
 #define PERSIST_MAGIC   0x48565202U /* "HVR" v2 */
@@ -396,6 +398,10 @@ void hwval_test_request_abort(void)  { s.abort_requested = 1; }
 
 int hwval_test_runner_progress_expired(void) /* FRT-013 */
 {
+    /* An idle Runner waiting for a job is not hung. */
+    if ((s.active == 0) && (s_job_running == 0)) {
+        return 0;
+    }
     uint32_t now    = (uint32_t)xTaskGetTickCount();
     uint32_t margin = s.running ? (s.current_timeout_ms + 5000U) : 5000U;
 
@@ -433,7 +439,11 @@ static int cfg_allows(const struct run_cfg *cfg, const struct tfw_case *c)
         return 0;
     }
     if (cfg->boot_mode) { /* SAFE-005 boot defaults */
-        return ((c->needs_operator == 0U) && (c->destructive == 0U)) ? 1 : 0;
+        /* MCU-resetting cases are left out too: every reset passes through
+         * the bootloader (dropping a host session in its Hello window) and
+         * the next boot would start the suite again.  Run them explicitly. */
+        return ((c->needs_operator == 0U) && (c->destructive == 0U) &&
+                (c->resets_mcu == 0U)) ? 1 : 0;
     }
     if ((c->needs_operator != 0U) && (cfg->operator_ok == 0U)) {
         return 0;
@@ -550,6 +560,10 @@ static void run_suite(struct run_cfg *cfg)
     if (outer && (s_hooks != NULL) && (s_hooks->run_started != NULL)) {
         s_hooks->run_started(total, cfg->resumed);
     }
+    if (outer) {
+        hwval_dbg('I', "run: %lu test(s)%s", (unsigned long)total,
+                  cfg->resumed ? ", resumed" : "");
+    }
 
     for (size_t i = cfg->start_index; i < s.count; i++) {
         if (cfg_allows(cfg, &s.order[i]) == 0) {
@@ -573,6 +587,9 @@ static void run_suite(struct run_cfg *cfg)
         if (outer && (s_hooks != NULL) && (s_hooks->test_result != NULL)) {
             s_hooks->test_result(&s.order[i], r);
         }
+        if (r->result == TFW_FAIL) {
+            hwval_dbg('W', "FAIL %s", s.order[i].id);
+        }
         if (hwval_test_abort_requested()) {
             break;
         }
@@ -582,6 +599,12 @@ static void run_suite(struct run_cfg *cfg)
     }
     s.running = 0;
     s.active = 0;
+    if (outer) {
+        hwval_dbg(fail != 0U ? 'W' : 'I',
+                  "run: done, %lu pass, %lu fail, %lu skip, %lu n/a",
+                  (unsigned long)pass, (unsigned long)fail,
+                  (unsigned long)skip, (unsigned long)na);
+    }
     if (outer && (s_hooks != NULL) && (s_hooks->run_finished != NULL)) {
         s_hooks->run_finished(index, pass, fail, skip, na,
                               hwval_test_abort_requested(), cfg->resumed);
@@ -593,7 +616,7 @@ static void run_suite(struct run_cfg *cfg)
     }
 }
 
-void hwval_test_all(void) /* boot suite (SAFE-005): no operator/destructive */
+void hwval_test_all(void) /* boot suite (SAFE-005): no operator/destructive/reset */
 {
     struct tfw_run_req req = { 0 };
     struct run_cfg cfg = { 0 };
@@ -936,9 +959,9 @@ static void bkp_lock(void)
 void hwval_bootcheck_arm(uint32_t case_hash, tfw_result_t expect)
 {
     bkp_unlock();
-    RTC->BKP0R = BOOTCHECK_MAGIC;
-    RTC->BKP1R = case_hash;
-    RTC->BKP2R = (uint32_t)expect;
+    HWVAL_BKP_CHECK_MAGIC = BOOTCHECK_MAGIC;
+    HWVAL_BKP_CHECK_HASH = case_hash;
+    HWVAL_BKP_CHECK_EXPECT = (uint32_t)expect;
     bkp_lock();
 }
 
@@ -950,29 +973,29 @@ void hwval_bootcheck_evaluate(void)
         return;
     }
     bkp_unlock();
-    if (RTC->BKP0R != BOOTCHECK_MAGIC) {
+    if (HWVAL_BKP_CHECK_MAGIC != BOOTCHECK_MAGIC) {
         bkp_lock();
         return;
     }
-    uint32_t hash   = RTC->BKP1R;
-    tfw_result_t got = (tfw_result_t)RTC->BKP2R;
+    uint32_t hash   = HWVAL_BKP_CHECK_HASH;
+    tfw_result_t got = (tfw_result_t)HWVAL_BKP_CHECK_EXPECT;
 
     if (hash == 0x5C01U) { /* RST.002: software reset flag */
-        got = ((RTC->BKP5R & RCC_CSR_SFTRSTF_Msk) != 0U) ? TFW_PASS
+        got = ((HWVAL_BKP_RESET_FLAGS & RCC_CSR_SFTRSTF_Msk) != 0U) ? TFW_PASS
                                                          : TFW_FAIL;
         (void)snprintf(line, sizeof(line),
                        "BOOTCHECK RST.002 SFTRSTF=%lu -> %s\r\n",
-                       (unsigned long)((RTC->BKP5R &
+                       (unsigned long)((HWVAL_BKP_RESET_FLAGS &
                          RCC_CSR_SFTRSTF_Msk) != 0U), res_name(got));
-        RTC->BKP0R = 0U; RTC->BKP1R = 0U; RTC->BKP2R = 0U;
+        HWVAL_BKP_CHECK_MAGIC = 0U; HWVAL_BKP_CHECK_HASH = 0U; HWVAL_BKP_CHECK_EXPECT = 0U;
         bkp_lock();
         hwval_uart3_write(line, 0U);
         return;
     }
     if (hash == 0x5D01U) { /* WDG.001: IWDG expiry timing vs RTC */
-        uint32_t armed_tr = RTC->BKP3R;
-        uint32_t expect_s = RTC->BKP4R;
-        uint32_t flags    = RTC->BKP5R;
+        uint32_t armed_tr = HWVAL_BKP_CHECK_ARG0;
+        uint32_t expect_s = HWVAL_BKP_CHECK_ARG1;
+        uint32_t flags    = HWVAL_BKP_RESET_FLAGS;
         uint32_t now      = RTC->TR;
         /* BCD seconds/min/hours delta over one day wrap */
         uint32_t as = ((now  >> 16U) & 3U) * 10U + ((now >> 20U) & 3U);
@@ -993,33 +1016,33 @@ void hwval_bootcheck_evaluate(void)
                        (unsigned long)((flags & RCC_CSR_IWDGRSTF_Msk) != 0U),
                        (unsigned long)delta, (unsigned long)expect_s,
                        res_name(got));
-        RTC->BKP0R = 0U; RTC->BKP1R = 0U; RTC->BKP2R = 0U;
-        RTC->BKP3R = 0U; RTC->BKP4R = 0U;
+        HWVAL_BKP_CHECK_MAGIC = 0U; HWVAL_BKP_CHECK_HASH = 0U; HWVAL_BKP_CHECK_EXPECT = 0U;
+        HWVAL_BKP_CHECK_ARG0 = 0U; HWVAL_BKP_CHECK_ARG1 = 0U;
         bkp_lock();
         hwval_uart3_write(line, 0U);
         return;
     }
     if (hash == 0x5D02U) { /* WDG.002: IWDG window violation */
-        got = ((RTC->BKP5R & RCC_CSR_IWDGRSTF_Msk) != 0U) ? TFW_PASS
+        got = ((HWVAL_BKP_RESET_FLAGS & RCC_CSR_IWDGRSTF_Msk) != 0U) ? TFW_PASS
                                                          : TFW_FAIL;
         (void)snprintf(line, sizeof(line),
                        "BOOTCHECK WDG.002 iwdgrst=%lu (window violation) -> "
                        "%s\r\n",
-                       (unsigned long)((RTC->BKP5R &
+                       (unsigned long)((HWVAL_BKP_RESET_FLAGS &
                          RCC_CSR_IWDGRSTF_Msk) != 0U), res_name(got));
-        RTC->BKP0R = 0U; RTC->BKP1R = 0U; RTC->BKP2R = 0U;
+        HWVAL_BKP_CHECK_MAGIC = 0U; HWVAL_BKP_CHECK_HASH = 0U; HWVAL_BKP_CHECK_EXPECT = 0U;
         bkp_lock();
         hwval_uart3_write(line, 0U);
         return;
     }
     if (hash == 0x5D03U) { /* WDG.003: WWDG out-of-window reset */
-        got = ((RTC->BKP5R & RCC_CSR_WWDGRSTF_Msk) != 0U) ? TFW_PASS
+        got = ((HWVAL_BKP_RESET_FLAGS & RCC_CSR_WWDGRSTF_Msk) != 0U) ? TFW_PASS
                                                          : TFW_FAIL;
         (void)snprintf(line, sizeof(line),
                        "BOOTCHECK WDG.003 wwdgrst=%lu -> %s\r\n",
-                       (unsigned long)((RTC->BKP5R &
+                       (unsigned long)((HWVAL_BKP_RESET_FLAGS &
                          RCC_CSR_WWDGRSTF_Msk) != 0U), res_name(got));
-        RTC->BKP0R = 0U; RTC->BKP1R = 0U; RTC->BKP2R = 0U;
+        HWVAL_BKP_CHECK_MAGIC = 0U; HWVAL_BKP_CHECK_HASH = 0U; HWVAL_BKP_CHECK_EXPECT = 0U;
         bkp_lock();
         hwval_uart3_write(line, 0U);
         return;
@@ -1030,27 +1053,27 @@ void hwval_bootcheck_evaluate(void)
                        "BOOTCHECK PWR.007 SBF=%lu -> %s\r\n",
                        (unsigned long)((PWR->CSR1 & PWR_CSR1_SBF_Msk) != 0U),
                        res_name(got));
-        RTC->BKP0R = 0U; RTC->BKP1R = 0U; RTC->BKP2R = 0U;
+        HWVAL_BKP_CHECK_MAGIC = 0U; HWVAL_BKP_CHECK_HASH = 0U; HWVAL_BKP_CHECK_EXPECT = 0U;
         bkp_lock();
         hwval_uart3_write(line, 0U);
         return;
     }
     if (hash == 0x5A00U) { /* RAM.009: backup-SRAM retention check */
         volatile const uint32_t *b = (const uint32_t *)0x40024000U;
-        got = ((b[0] == RTC->BKP3R) && (b[1] == RTC->BKP4R)) ? TFW_PASS
+        got = ((b[0] == HWVAL_BKP_CHECK_ARG0) && (b[1] == HWVAL_BKP_CHECK_ARG1)) ? TFW_PASS
                                                             : TFW_FAIL;
         (void)snprintf(line, sizeof(line),
                        "BOOTCHECK RAM.009 bkpsram=%08lX%08lX -> %s\r\n",
                        (unsigned long)b[1], (unsigned long)b[0],
                        res_name(got));
-        RTC->BKP0R = 0U; RTC->BKP1R = 0U; RTC->BKP2R = 0U;
+        HWVAL_BKP_CHECK_MAGIC = 0U; HWVAL_BKP_CHECK_HASH = 0U; HWVAL_BKP_CHECK_EXPECT = 0U;
         bkp_lock();
         hwval_uart3_write(line, 0U);
         return;
     }
-    RTC->BKP0R = 0U;
-    RTC->BKP1R = 0U;
-    RTC->BKP2R = 0U;
+    HWVAL_BKP_CHECK_MAGIC = 0U;
+    HWVAL_BKP_CHECK_HASH = 0U;
+    HWVAL_BKP_CHECK_EXPECT = 0U;
     bkp_lock();
 
     (void)snprintf(line, sizeof(line),

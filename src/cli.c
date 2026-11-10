@@ -33,6 +33,7 @@
 #include "harness.h"
 #include "test_core.h"
 #include "link.h"
+#include "debug_uart.h"
 
 #ifndef HWVAL_CUBE_VERSION
 #define HWVAL_CUBE_VERSION "unknown"
@@ -500,6 +501,8 @@ static void cmd_reset(int argc, char **argv)
         for (;;) { ; } /* expiry resets */
     }
     cli_line("software reset");
+    hwval_dbg('I', "CLI: software reset");
+    hwval_dbg_flush(20U);
     vTaskDelay(pdMS_TO_TICKS(50)); /* drain the TX ring */
     NVIC_SystemReset();
 }
@@ -527,6 +530,7 @@ static void cmd_mode(int argc, char **argv)
         hwval_uart3_drain(200U);
         hwval_link_set_boot_flag(1); /* LINK-010 */
         g_set.mode = HWVAL_MODE_LINK;
+        hwval_dbg('I', "mode: link (HWLINK on USART3)");
         return;
     }
     cli_line("ERR unknown command (interactive|script|link)");
@@ -815,6 +819,39 @@ static void cmd_dispatch(char *line)
     cli_printf("ERR unknown command '%s' (try help)\r\n", argv[0]);
 }
 
+/* HWLINK auto-detect: raw bytes since the last 0x00, so a host tool that
+ * speaks HWLINK without "mode link" first (bootctl) is answered. */
+static uint8_t s_frame[256];
+static size_t s_frame_len;
+static int s_frame_overflow;
+
+/* Returns 1 when c ended a HWLINK frame and the CLI switched to link mode. */
+static int frame_detect(int c)
+{
+    if (c != 0) {
+        if (s_frame_len < sizeof(s_frame)) {
+            s_frame[s_frame_len++] = (uint8_t)c;
+        } else {
+            s_frame_overflow = 1;
+        }
+        return 0;
+    }
+    /* 0x00 is never typed: it is a COBS frame delimiter. */
+    int have = (s_frame_len > 0U) ? 1 : 0;
+
+    if ((have != 0) && (s_frame_overflow == 0)) {
+        hwval_link_prime(s_frame, s_frame_len);
+    }
+    s_frame_len = 0U;
+    s_frame_overflow = 0;
+    if (have == 0) {
+        return 0;
+    }
+    editor_reset();
+    g_set.mode = HWVAL_MODE_LINK;
+    return 1;
+}
+
 void hwval_cli_task(void *arg)
 {
     (void)arg;
@@ -843,6 +880,9 @@ void hwval_cli_task(void *arg)
             cli_baud_revert_poll();
             vTaskDelay(pdMS_TO_TICKS(10));
             continue;
+        }
+        if (frame_detect(c) != 0) {
+            continue;   /* link loop takes over on the next iteration */
         }
 
         if (g_set.mode == HWVAL_MODE_SCRIPT) {

@@ -37,9 +37,11 @@
 #include "test_core.h"
 #include "uart3.h"
 #include "version.h"
+#include "boot_slot.h"
 #include "flatcc/flatcc_builder.h"
 #include "hwlink_builder.h"
 #include "hwlink_verifier.h"
+#include "debug_uart.h"
 
 #ifndef HWVAL_FIRMWARE_NAME
 #define HWVAL_FIRMWARE_NAME "HWVAL"
@@ -55,6 +57,7 @@
 #define LINK_ANSWER_QUEUE_LEN   4U
 #define LINK_LOG_TEXT_MAX       160U
 #define LINK_PROMPT_ANSWER_MAX  32U
+#define LINK_PRIME_MAX          256U
 
 /* NFR-004: the link buffers are bulk RAM, so they live in .sram1 (zeroed by
  * main before the scheduler starts) rather than consuming the DTCM reserve. */
@@ -324,6 +327,50 @@ static bool link_send_pong(uint16_t seq)
     hwlink_Pong_ref_t pong =
         hwlink_Pong_create(&s_builder, (uint64_t)HAL_GetTick());
     return link_end(hwlink_Body_as_Pong(pong), seq, HWLINK_FLAG_RESPONSE, 1);
+}
+
+/* Status: the BOOT slot and trial state that bootctl waits for after an
+ * update, plus identity, uptime and heap. */
+static bool link_send_status(uint16_t seq)
+{
+    if (!link_begin()) { return false; }
+    uint32_t cause = hwval_reset_cause_flags();
+    flatbuffers_string_ref_t name =
+        flatbuffers_string_create_str(&s_builder, HWVAL_FIRMWARE_NAME);
+    flatbuffers_string_ref_t version =
+        flatbuffers_string_create_str(&s_builder, hwval_version_string());
+    flatbuffers_string_ref_t commit =
+        flatbuffers_string_create_str(&s_builder, hwval_git_commit());
+    flatbuffers_string_ref_t build =
+        flatbuffers_string_create_str(&s_builder, hwval_build_date());
+    flatbuffers_string_ref_t cause_text =
+        flatbuffers_string_create_str(&s_builder, hwval_reset_cause_name(cause));
+    uint64_t uid = ((uint64_t)HAL_GetUIDw0() << 32U) |
+                   (uint64_t)HAL_GetUIDw1();
+
+    hwlink_Status_start(&s_builder);
+    hwlink_Status_firmware_name_add(&s_builder, name);
+    hwlink_Status_version_add(&s_builder, version);
+    hwlink_Status_commit_add(&s_builder, commit);
+    hwlink_Status_build_time_add(&s_builder, build);
+    hwlink_Status_uid_add(&s_builder, uid);
+    hwlink_Status_uptime_ms_add(&s_builder, (uint64_t)HAL_GetTick());
+    hwlink_Status_slot_add(&s_builder, (hwlink_Slot_enum_t)hwval_boot_slot());
+    hwlink_Status_trial_add(&s_builder,
+                            (hwlink_TrialState_enum_t)hwval_boot_trial());
+    hwlink_Status_trial_count_add(&s_builder, hwval_boot_trial_count());
+    hwlink_Status_health_add(&s_builder,
+                             (hwlink_HealthState_enum_t)hwval_boot_health());
+    hwlink_Status_reset_cause_add(&s_builder, cause);
+    hwlink_Status_reset_cause_text_add(&s_builder, cause_text);
+    hwlink_Status_heap_free_add(&s_builder, (uint32_t)xPortGetFreeHeapSize());
+    hwlink_Status_heap_min_free_add(&s_builder,
+                                    (uint32_t)xPortGetMinimumEverFreeHeapSize());
+    hwlink_Status_protocol_major_add(&s_builder, (uint16_t)HWLINK_PROTOCOL_MAJOR);
+    hwlink_Status_protocol_minor_add(&s_builder, (uint16_t)HWLINK_PROTOCOL_MINOR);
+    hwlink_Status_ref_t status = hwlink_Status_end(&s_builder);
+    return link_end(hwlink_Body_as_Status(status), seq,
+                    HWLINK_FLAG_RESPONSE, 1);
 }
 
 static bool link_send_log(hwlink_LogLevel_enum_t level,
@@ -1253,7 +1300,23 @@ static void link_handle_payload(uint16_t seq, const uint8_t *payload, size_t len
     case hwlink_Body_Reset:
         persist_clear();
         if (link_send_ack(seq)) {
+            hwval_dbg('I', "HWLINK: Reset");
+            hwval_dbg_flush(20U);
             hwval_uart3_drain(100U);
+            NVIC_SystemReset();
+        }
+        break;
+    case hwlink_Body_GetStatus:
+        (void)link_send_status(seq);
+        break;
+    case hwlink_Body_EnterBootloader:
+        /* bootctl update/info: reset into BOOT and stay there (ENT-002). */
+        persist_clear();
+        if (link_send_ack(seq)) {
+            hwval_dbg('I', "HWLINK: EnterBootloader, resetting into BOOT");
+            hwval_dbg_flush(20U);
+            hwval_uart3_drain(100U);
+            hwval_boot_request_bootloader();
             NVIC_SystemReset();
         }
         break;
@@ -1368,6 +1431,19 @@ static void link_handle_raw(const uint8_t *raw, size_t raw_len)
     link_handle_payload(seq, s_rx_payload, payload_len);
 }
 
+/* A frame the text CLI received before it switched to link mode. */
+static uint8_t s_prime[LINK_PRIME_MAX];
+static size_t s_prime_len;
+
+void hwval_link_prime(const uint8_t *frame, size_t len)
+{
+    if (len > sizeof(s_prime)) {
+        len = 0U;   /* too long to replay; the host retries */
+    }
+    memcpy(s_prime, frame, len);
+    s_prime_len = len;
+}
+
 static void link_feed_byte(uint8_t byte)
 {
     if (byte == 0U) {
@@ -1451,6 +1527,17 @@ void hwval_link_run(void)
     hwval_test_set_hooks(&s_hooks);
 
     link_boot_report();
+    if (s_prime_len != 0U) {
+        /* The CLI echoed the frame's printable bytes: a delimiter closes
+         * that noise on the host as one bad frame before the reply. */
+        static const uint8_t delimiter = 0U;
+        hwval_uart3_write_direct(&delimiter, 1U);
+        for (size_t i = 0U; i < s_prime_len; i++) {
+            link_feed_byte(s_prime[i]);
+        }
+        s_prime_len = 0U;
+        link_feed_byte(0U);
+    }
     if (s_have_resume != 0) {
         s_have_resume = 0;
         (void)hwval_test_submit(&s_resume_req);

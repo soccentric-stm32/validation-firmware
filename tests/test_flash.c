@@ -50,14 +50,16 @@ static uint32_t flash_crc32_cpu(uint32_t addr, uint32_t bytes)
     return crc32_buf((const uint8_t *)addr, bytes);
 }
 
-extern uint32_t __flash_image_end; /* from the linker script */
+extern uint32_t __flash_image_start; /* from the linker script: slot base */
+extern uint32_t __flash_image_end;
 
 static tfw_result_t fls_crc_image(struct tfw_out *o)
 {
-    uint32_t bytes = (uint32_t)&__flash_image_end - 0x08000000U;
+    uint32_t start = (uint32_t)&__flash_image_start;
+    uint32_t bytes = (uint32_t)&__flash_image_end - start;
     bytes &= ~3U;   /* the CRC unit reads whole words; compare like for like */
-    uint32_t per = flash_crc32_periph(0x08000000U, bytes);
-    uint32_t cpu = flash_crc32_cpu(0x08000000U, bytes);
+    uint32_t per = flash_crc32_periph(start, bytes);
+    uint32_t cpu = flash_crc32_cpu(start, bytes);
 
     hwval_meas(o, "crc=%08lX/%08lX over %lu KB", (unsigned long)per,
                (unsigned long)cpu, (unsigned long)(bytes / 1024U));

@@ -18,6 +18,7 @@
 #include "hwval_limits.h"
 #include "test_core.h"
 #include "harness.h"
+#include "debug_uart.h"
 
 struct uart_def {
     USART_TypeDef *u;
@@ -89,7 +90,7 @@ static int uart_loop_block(USART_TypeDef *u, uint32_t baud, uint8_t *buf,
 }
 
 /* -------------------------------------------------- UART-001 ----------- */
-static tfw_result_t uart_loopback_all(struct tfw_out *o)
+static tfw_result_t uart_loopback_all_run(struct tfw_out *o)
 {
     static uint8_t blk[1024];
     int fitted = 0, bad = 0;
@@ -197,7 +198,7 @@ static tfw_result_t uart_flow_err_dma(struct tfw_out *o)
 }
 
 /* -------------------------------------------------- UART-009 ----------- */
-static tfw_result_t uart_special(struct tfw_out *o)
+static tfw_result_t uart_special_run(struct tfw_out *o)
 {
     /* config-level: LIN, IrDA, smartcard, sync CK, RS485 DE, multiproc,
      * auto-baud register paths on USART1..USART8 */
@@ -256,6 +257,24 @@ static tfw_result_t uart_special(struct tfw_out *o)
         return TFW_FAIL;
     }
     return TFW_PASS;
+}
+
+/* DUART-003: these use USART6 (the debug port), so the debug output waits
+ * in its ring while they run. */
+static tfw_result_t uart_loopback_all(struct tfw_out *o)
+{
+    hwval_dbg_pause();
+    tfw_result_t r = uart_loopback_all_run(o);
+    hwval_dbg_resume();
+    return r;
+}
+
+static tfw_result_t uart_special(struct tfw_out *o)
+{
+    hwval_dbg_pause();
+    tfw_result_t r = uart_special_run(o);
+    hwval_dbg_resume();
+    return r;
 }
 
 /* -------------------------------------------------- UART-010 ----------- */

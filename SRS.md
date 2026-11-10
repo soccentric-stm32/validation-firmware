@@ -843,6 +843,19 @@ The F767 has TIM1–TIM14 and LPTIM1. Every timer shall be tested.
 | NFR-010 | **Documentation:** a user guide shall describe the CLI, every test (generated from the test table), the harness wiring and the external equipment setup. | I |
 | NFR-011 | **Footprint with link mode:** the flatcc runtime and the HWLINK code shall fit within NFR-003 and keep the RAM floors of NFR-004; `scripts/check_footprint.py` shall still pass. (CR-08) | I |
 
+### Debug output (USART6)
+
+USART3 is the HWVAL console and HWLINK port.  Debug lines go to USART6 TX
+on PG14 (Arduino D1), 115200 8N1, in the format BOOT and the demo
+applications use: `[<ms>] <TAG> <E|W|I|D> <text>` (milliseconds since reset, right-aligned to 7 digits, CR LF), tag `HWVAL`.
+
+| ID | Requirement | Method |
+|---|---|---|
+| DUART-001 | HWVAL shall log start (version, commit, slot, trial state, reset cause), the BOOT trial health verdict, entering link mode, each test run (count, failures by ID, summary) and deliberate resets. | D |
+| DUART-002 | `hwval_dbg()` shall copy the line into a 1 KB ring and return; a priority-1 task shall drain it by polling, with no interrupt and no DMA, because the interrupt and DMA tests own those (`USART6_IRQHandler` in test_int.c, the DMA2 sweep). Output may lag while CPU-bound tests run; a full ring drops lines. | I |
+| DUART-003 | Tests that use or reset USART6 (UART-001/003 loopback, UART-009 special modes, RST-007 peripheral reset) shall pause the debug output and re-initialise USART6 afterwards, so their coverage is unchanged. | T |
+| DUART-004 | PG14 and PG9 shall be console-owned in the pin table, so the GPIO and ADC tests never drive them. | I |
+
 ---
 
 ## 11. Host-side tooling requirements

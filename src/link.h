@@ -30,6 +30,9 @@ int  hwval_link_boot_active(void);
 /* CLI task enters this loop after `mode link`; returns when EnterTextMode
  * (or the OPEN-011 text fallback) asks for the text CLI again. */
 void hwval_link_run(void);
+/* Hand link mode a COBS frame body (without its 0x00 delimiter) that the
+ * text CLI received; hwval_link_run() answers it first. */
+void hwval_link_prime(const uint8_t *frame, size_t len);
 
 /* Install/remove the reset-surviving link-mode flag (LINK-010). */
 void hwval_link_set_boot_flag(int on);

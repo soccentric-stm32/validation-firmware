@@ -176,6 +176,7 @@ static volatile uint32_t s_mpu_exc;
 
 #define MPU_PROBE_OK(label)                                         \
     do {                                                            \
+        HWVAL_FAULT_RECOVER_POINT(label);                           \
         hwval_fault_recover = 0;                                    \
         s_mpu_probe = 2U; /* no fault = protection missing           */ \
         goto label##_done;                                          \

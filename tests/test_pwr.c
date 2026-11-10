@@ -369,7 +369,17 @@ static tfw_result_t pwr_backup_domain(struct tfw_out *o)
 {
     /* Destructive: BDRST clears RTC configuration + all backup registers.
      * After the reset of the backup domain, verify DBP access and re-arm
-     * the LSE/RTC for the rest of the suite. */
+     * the LSE/RTC for the rest of the suite.  The bootloader's trial state
+     * and hand-over (BKP0R..BKP3R) and the link flag (BKP7R) are put back
+     * afterwards so BOOT does not lose track of the running slot. */
+    uint32_t saved[HWVAL_BKP_BOOT_COUNT];
+    uint32_t saved_link;
+
+    for (uint32_t i = 0U; i < HWVAL_BKP_BOOT_COUNT; i++) {
+        saved[i] = (&RTC->BKP0R)[HWVAL_BKP_BOOT_FIRST + i];
+    }
+    saved_link = (&RTC->BKP0R)[HWVAL_BKP_LINK_INDEX];
+
     __HAL_RCC_PWR_CLK_ENABLE();
     SET_BIT(PWR->CR1, PWR_CR1_DBP);
     SET_BIT(RCC->BDCR, RCC_BDCR_BDRST);
@@ -378,9 +388,13 @@ static tfw_result_t pwr_backup_domain(struct tfw_out *o)
 
     int rw_ok;
     RTC->WPR = 0xCAU; RTC->WPR = 0x53U;
-    RTC->BKP0R = 0x1234567CU;
-    rw_ok = (RTC->BKP0R == 0x1234567CU);
-    RTC->BKP0R = 0U;
+    HWVAL_BKP_CHECK_ARG0 = 0x1234567CU;
+    rw_ok = (HWVAL_BKP_CHECK_ARG0 == 0x1234567CU);
+    HWVAL_BKP_CHECK_ARG0 = 0U;
+    for (uint32_t i = 0U; i < HWVAL_BKP_BOOT_COUNT; i++) {
+        (&RTC->BKP0R)[HWVAL_BKP_BOOT_FIRST + i] = saved[i];
+    }
+    (&RTC->BKP0R)[HWVAL_BKP_LINK_INDEX] = saved_link;
     RTC->WPR = 0xFFU;
 
     /* re-arm LSE so later LSE-referenced tests still work */

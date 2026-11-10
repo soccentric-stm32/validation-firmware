@@ -27,7 +27,9 @@ volatile const char *g_assert_file;
  * stacked PC is redirected to hwval_fault_recover_pc and the exception
  * returns instead of halting. */
 volatile int          hwval_fault_recover;
-volatile void        *hwval_fault_recover_pc;   /* &&label inside test   */
+/* The pointer itself is volatile: its store must not move past the access
+ * that faults. */
+void *volatile        hwval_fault_recover_pc;   /* &&label inside test   */
 volatile uint32_t     hwval_fault_last_exc;     /* 3 hard, 4 mem, 5 bus, 6 usage */
 volatile uint32_t     hwval_fault_cfsr_snap;
 

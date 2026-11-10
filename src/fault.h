@@ -46,8 +46,15 @@ hwval_fault_action_t hwval_fault_get_action(void);
 
 /* Fault-recovery for CORE/MPU tests: arm before triggering an expected
  * fault; the handler redirects the stacked PC to the label and returns. */
+/* Place right after the access expected to fault.  Without an edge to the
+ * recovery label GCC (-O2) treats it as unreachable and drops it, so
+ * &&label no longer points at the recovery code (it resolved to the
+ * function entry).  The empty asm goto keeps the label and its code. */
+#define HWVAL_FAULT_RECOVER_POINT(label) \
+    __asm__ goto ("" : : : "memory" : label)
+
 extern volatile int      hwval_fault_recover;
-extern volatile void    *hwval_fault_recover_pc;
+extern void *volatile    hwval_fault_recover_pc;
 extern volatile uint32_t hwval_fault_last_exc;   /* 3 hard 4 mem 5 bus 6 usage */
 extern volatile uint32_t hwval_fault_cfsr_snap;
 extern volatile int      g_assert_line;

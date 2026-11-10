@@ -54,9 +54,12 @@ else()
 endif()
 execute_process(COMMAND git -C ${CMAKE_CURRENT_SOURCE_DIR} rev-parse --short=12 HEAD
     OUTPUT_VARIABLE HWVAL_GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+execute_process(COMMAND git -C ${CMAKE_CURRENT_SOURCE_DIR} rev-parse HEAD
+    OUTPUT_VARIABLE HWVAL_GIT_COMMIT_FULL OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
 execute_process(COMMAND git -C ${CMAKE_CURRENT_SOURCE_DIR} log -1 --date=iso --format=%cd
     OUTPUT_VARIABLE HWVAL_COMMIT_DATE OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
 string(TIMESTAMP HWVAL_BUILD_DATE "%Y-%m-%d %H:%M:%S")
+string(TIMESTAMP HWVAL_BUILD_TIMESTAMP "%s" UTC)
 
 # --- Toolchain flags --------------------------------------------------------
 set(CPU_FLAGS -mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard)
@@ -79,6 +82,8 @@ add_compile_definitions(
     STM32F767xx
     USE_HAL_DRIVER
     HSE_VALUE=8000000U          # ST-LINK MCO feeds PH0 in bypass mode (CON-005)
+    USER_VECT_TAB_ADDRESS       # vector table at the bootloader slot (LAY-002)
+    VECT_TAB_OFFSET=0x0000C000U
     HWVAL_VERSION_STR="${HWVAL_VERSION}"
     HWVAL_SRS_ID="SRS-HWVAL-F767"
     HWVAL_GIT_COMMIT="${HWVAL_GIT_COMMIT}"
@@ -119,7 +124,9 @@ set(HAL_SOURCES
 set(PROJECT_SOURCES
     src/main.c
     src/clock.c
+    src/debug_uart.c
     src/version.c
+    src/boot_slot.c
     src/uart3.c
     src/fault.c
     src/iwdg.c
@@ -331,9 +338,21 @@ add_custom_target(clang-tidy
     VERBATIM)
 
 set(ELF "$<TARGET_FILE:hwval.elf>")
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+# hwval.img is the slot image (256-byte BOOT header + hwval.bin) that bootctl
+# uploads; BOOT accepts it only after it is signed (tools/mkimage.py --sign in
+# the bootloader repository).
 add_custom_command(TARGET hwval.elf POST_BUILD
     COMMAND ${CMAKE_OBJCOPY} -O binary  ${ELF} ${CMAKE_BINARY_DIR}/hwval.bin
     COMMAND ${CMAKE_OBJCOPY} -O ihex    ${ELF} ${CMAKE_BINARY_DIR}/hwval.hex
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/mkimage.py
+            --input ${CMAKE_BINARY_DIR}/hwval.bin
+            --output ${CMAKE_BINARY_DIR}/hwval.img
+            --version ${HWVAL_VERSION}
+            --commit "${HWVAL_GIT_COMMIT_FULL}"
+            --timestamp ${HWVAL_BUILD_TIMESTAMP}
+            --name hwval
     COMMAND ${SIZE_TOOL} $<TARGET_FILE:hwval.elf>
     BYPRODUCTS ${CMAKE_BINARY_DIR}/hwval.bin ${CMAKE_BINARY_DIR}/hwval.hex
-    COMMENT "Generating hwval.bin and hwval.hex")
+               ${CMAKE_BINARY_DIR}/hwval.img
+    COMMENT "Generating hwval.bin, hwval.hex and hwval.img")

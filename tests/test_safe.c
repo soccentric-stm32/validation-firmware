@@ -50,6 +50,7 @@ static tfw_result_t safe_otp_ro(struct tfw_out *o)
     /* cppcheck-suppress assignBoolToPointer */ hwval_fault_recover_pc = (void *)&&otp_ro_ok;
     hwval_fault_recover = 1;
     *(volatile uint32_t *)HWVAL_OTP_BASE = 0U; /* expect MemManage */
+    HWVAL_FAULT_RECOVER_POINT(otp_ro_ok);
     hwval_fault_recover = 0;
     (void)snprintf(o->reason, sizeof(o->reason), "OTP write did not fault");
     goto done;

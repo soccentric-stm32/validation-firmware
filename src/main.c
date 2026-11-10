@@ -26,6 +26,8 @@
 #include "test_core.h"
 #include "link.h"
 #include "flash_ops.h"
+#include "boot_slot.h"
+#include "debug_uart.h"
 
 /* NFR-004: .sram1 is NOLOAD; main.c zeroes it after the MPU is up so the
  * static test buffers get their C zero-init state (startup zeroes .bss). */
@@ -57,8 +59,18 @@ int main(void)
     }
     HAL_Init();                 /* HAL time base on TIM6 (GEN-012)           */
     hwval_clock_init();         /* GEN-004: 216 MHz, scale 1, OD, 7 WS       */
+    hwval_dbg_init();           /* DUART-001: debug text on USART6 (PG14)    */
     hwval_uart3_init();         /* VCP console (USART3, section 6 builds on) */
+    hwval_boot_init();          /* BOOT hand-over: slot and trial state      */
     hwval_link_boot_init();     /* LINK-010: previous reset was in link mode */
+    hwval_dbg('I', "start v%s %s, slot %c %s, reset %s",
+              hwval_version_string(), hwval_git_commit(),
+              hwval_boot_slot() == HWVAL_SLOT_A ? 'A' :
+              hwval_boot_slot() == HWVAL_SLOT_B ? 'B' : '?',
+              hwval_boot_trial() == HWVAL_TRIAL_PENDING ? "on trial" :
+              hwval_boot_trial() == HWVAL_TRIAL_CONFIRMED ? "confirmed"
+                                                          : "no hand-over",
+              hwval_reset_cause_name(hwval_reset_cause_flags()));
     if (hwval_link_boot_active() == 0) {
         hwval_version_banner();     /* GEN-003                               */
         hwval_reset_cause_report(); /* GEN-010                               */
