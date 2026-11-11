@@ -10,7 +10,7 @@
  */
 
 #include "stm32f7xx_hal.h"
-#include "iwdg.h"
+#include "bsp/iwdg.h"
 
 #define IWDG_KEY_ACCESS  0x5555U
 #define IWDG_KEY_REFRESH 0xAAAAU

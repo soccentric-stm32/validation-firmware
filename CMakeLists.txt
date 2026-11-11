@@ -124,34 +124,46 @@ set(HAL_SOURCES
     "${CUBE_ROOT}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_crc_ex.c")
 
 set(PROJECT_SOURCES
-    src/main.c
-    src/clock.c
-    src/debug_uart.c
-    src/version.c
-    src/boot_slot.c
-    src/uart3.c
-    src/fault.c
-    src/iwdg.c
-    src/reset_cause.c
-    src/mpu_setup.c
-    src/hal_timebase.c
-    src/syscalls.c
-    src/rtos.c
-    src/test_core.c
-    src/cli.c
-    src/settings.c
-    src/harness.c
-    src/hwlink.c
-    src/flatcc_port.c
-    src/link.c
+    # app/ - entry point, CLI, test framework and runtime settings
+    src/app/main.c
+    src/app/cli.c
+    src/app/test_core.c
+    src/app/harness.c
+    src/app/settings.c
+    src/app/version.c
+    src/app/boot_slot.c
+
+    # bsp/ - board bring-up and peripheral drivers
+    src/bsp/clock.c
+    src/bsp/debug_uart.c
+    src/bsp/uart3.c
+    src/bsp/iwdg.c
+    src/bsp/reset_cause.c
+    src/bsp/mpu_setup.c
+    src/bsp/hal_timebase.c
+    src/bsp/syscalls.c
+    src/bsp/flash_ops.c
+
+    # services/ - cross-cutting services (faults, RTOS glue, LwIP)
+    src/services/fault.c
+    src/services/rtos.c
+    src/services/net_lwip.c
+
+    # protocol/ - HWLINK framing, link mode and flatcc arena hooks
+    src/protocol/hwlink.c
+    src/protocol/flatcc_port.c
+    src/protocol/link.c
+
+    # board/ - board pin map
     board/hwval_board_pins.c
+
+    # tests/ - on-target test cases (linked into the image)
     tests/test_rtos.c
     tests/test_dev.c
     tests/test_core_m7.c
     tests/test_cache_mpu.c
     tests/test_ram.c
     tests/test_flash.c)
-list(APPEND PROJECT_SOURCES src/flash_ops.c)
 list(APPEND PROJECT_SOURCES   tests/test_clk.c)
 list(APPEND PROJECT_SOURCES   tests/test_pwr.c)
 list(APPEND PROJECT_SOURCES   tests/test_rst_wdg.c)
@@ -170,7 +182,7 @@ list(APPEND PROJECT_SOURCES   tests/test_sai_spdif.c)
 # --- LwIP (SDK as shipped, CON-002): ETH-007/008 (section 8.27/section 11) --
 # The middleware compiles into a static lib with SDK-level warning policy
 # (-w) because the project -Werror policy does not extend to the SDK; the
-# project-owned glue (src/net_lwip.c, arch headers) stays under -Werror.
+# project-owned glue (src/services/net_lwip.c, arch headers) stays under -Werror.
 set(LWIP_ROOT "${CUBE_ROOT}/Middlewares/Third_Party/LwIP/src")
 set(LWIP_SOURCES
     "${LWIP_ROOT}/core/init.c"
@@ -202,7 +214,6 @@ set(LWIP_SOURCES
     "${LWIP_ROOT}/core/ipv4/ip4_addr.c"
     "${LWIP_ROOT}/core/ipv4/ip4_frag.c"
     "${LWIP_ROOT}/netif/ethernet.c")
-list(APPEND PROJECT_SOURCES src/net_lwip.c)
 list(APPEND HAL_SOURCES
     "${CUBE_ROOT}/Drivers/STM32F7xx_HAL_Driver/Src/stm32f7xx_hal_eth.c")
 list(APPEND PROJECT_SOURCES   tests/test_i2c.c)
@@ -214,7 +225,8 @@ list(APPEND PROJECT_SOURCES   tests/test_dbg_brd.c)
 list(APPEND PROJECT_SOURCES   tests/test_safe.c)
 
 # flatcc 0.6.1 runtime as released (CON-002).  Only builder, verifier and
-# emitter are linked; the project-owned arena hooks are in src/flatcc_port.c.
+# emitter are linked; the project-owned arena hooks are in
+# src/protocol/flatcc_port.c.
 set(FLATCC_ROOT "${CMAKE_SOURCE_DIR}/third_party/flatcc")
 set(FLATCC_SOURCES
     "${FLATCC_ROOT}/src/runtime/builder.c"
@@ -242,7 +254,8 @@ set(FREERTOS_SOURCES
     "${FREERTOS_ROOT}/portable/MemMang/heap_4.c")
 
 # flatcc allocation hooks are visible everywhere (the runtime uses them).
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -include ${CMAKE_SOURCE_DIR}/src/flatcc_port.h")
+set(CMAKE_C_FLAGS
+    "${CMAKE_C_FLAGS} -include ${CMAKE_SOURCE_DIR}/src/protocol/flatcc_port.h")
 set(HWVAL_FLATCC_HEAP_KB "12" CACHE STRING "flatcc static arena size in KB")
 math(EXPR HWVAL_FLATCC_HEAP_BYTES "${HWVAL_FLATCC_HEAP_KB} * 1024")
 
@@ -260,7 +273,7 @@ target_compile_definitions(hwval.elf PRIVATE
     FLATCC_EMITTER_ALLOC=hwval_flatcc_alloc
     FLATCC_EMITTER_FREE=hwval_flatcc_free)
 # The generated flatcc headers and the SDK runtime use compact formatting.
-set_source_files_properties(src/link.c PROPERTIES
+set_source_files_properties(src/protocol/link.c PROPERTIES
     COMPILE_OPTIONS "-Wno-misleading-indentation")
 set_source_files_properties(${FLATCC_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
 

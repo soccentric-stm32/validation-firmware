@@ -14,8 +14,8 @@
 
 #include <stdio.h>
 #include "stm32f7xx_hal.h"
-#include "fault.h"
-#include "uart3.h"
+#include "services/fault.h"
+#include "bsp/uart3.h"
 
 static hwval_taskname_fn_t s_taskname;
 static volatile hwval_fault_action_t s_action = HWVAL_FAULT_HALT;

@@ -14,10 +14,10 @@
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
 #include "hwval_limits.h"
-#include "test_core.h"
-#include "clock.h"
-#include "harness.h"
-#include "settings.h"
+#include "app/test_core.h"
+#include "bsp/clock.h"
+#include "app/harness.h"
+#include "app/settings.h"
 
 /* ----------------------------------------------- register-level ADC1 ---- */
 static void adc1_clock_on(void)

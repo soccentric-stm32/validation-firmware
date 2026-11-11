@@ -12,7 +12,7 @@
  */
 
 #include <string.h>
-#include "flatcc_port.h"
+#include "protocol/flatcc_port.h"
 
 #ifndef HWVAL_FLATCC_HEAP_SIZE
 #define HWVAL_FLATCC_HEAP_SIZE (16U * 1024U)

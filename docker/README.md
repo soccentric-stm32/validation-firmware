@@ -4,7 +4,7 @@
 |---|---|
 | **Author** | Sandesh Ghimire <sandesh@soccentric.com> |
 | **Date** | 2026-11-02 |
-| **Board** | NUCLEO-F767ZI (see [Hardware.md](../Hardware.md)) |
+| **Board** | NUCLEO-F767ZI (see [Hardware.md](../docs/Hardware.md)) |
 
 A container with everything needed to build, flash and debug the firmware, so
 the host only needs Docker. The wrapper script

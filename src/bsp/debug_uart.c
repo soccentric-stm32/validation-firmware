@@ -16,7 +16,7 @@
 #include "stm32f7xx_hal.h"
 #include "FreeRTOS.h"
 #include "task.h"
-#include "debug_uart.h"
+#include "bsp/debug_uart.h"
 
 #define DBG_BAUD          115200U
 #define DBG_RING_SIZE     1024U           /* power of two */

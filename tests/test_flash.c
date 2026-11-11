@@ -13,10 +13,10 @@
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
 #include "hwval_limits.h"
-#include "test_core.h"
-#include "flash_ops.h"
-#include "clock.h"
-#include "fault.h"
+#include "app/test_core.h"
+#include "bsp/flash_ops.h"
+#include "bsp/clock.h"
+#include "services/fault.h"
 
 /* wrong-key helper in src/flash_ops.c */
 void hwval_flash_wrong_key_lock(void);

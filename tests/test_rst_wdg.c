@@ -14,11 +14,11 @@
 #include "task.h"
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "test_core.h"
-#include "reset_cause.h"
-#include "settings.h"
-#include "cli.h"
-#include "debug_uart.h"
+#include "app/test_core.h"
+#include "bsp/reset_cause.h"
+#include "app/settings.h"
+#include "app/cli.h"
+#include "bsp/debug_uart.h"
 
 /* -------------------------------------------------- RST-001 ------------ */
 static tfw_result_t rst_flags_boot(struct tfw_out *o)

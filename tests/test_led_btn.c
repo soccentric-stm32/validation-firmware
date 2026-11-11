@@ -14,9 +14,9 @@
 #include "task.h"
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "test_core.h"
-#include "cli.h"
-#include "settings.h"
+#include "app/test_core.h"
+#include "app/cli.h"
+#include "app/settings.h"
 
 static int ask(const char *q)
 {

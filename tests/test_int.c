@@ -15,9 +15,9 @@
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
 #include "hwval_limits.h"
-#include "test_core.h"
-#include "fault.h"
-#include "harness.h"
+#include "app/test_core.h"
+#include "services/fault.h"
+#include "app/harness.h"
 
 #define INT_N ((int)(INT_TBL_N))
 

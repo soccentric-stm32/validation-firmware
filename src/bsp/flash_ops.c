@@ -11,9 +11,9 @@
 #include <string.h>
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "flash_ops.h"
-#include "test_core.h"
-#include "uart3.h"
+#include "bsp/flash_ops.h"
+#include "app/test_core.h"
+#include "bsp/uart3.h"
 
 #define FLASH_SEC11_BASE HWVAL_SECTOR11_BASE
 #define FLASH_SEC11_LEN  (HWVAL_FLASH_END - HWVAL_SECTOR11_BASE)

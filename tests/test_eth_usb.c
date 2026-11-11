@@ -14,7 +14,7 @@
 #include "task.h"
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "test_core.h"
+#include "app/test_core.h"
 
 /* -------------------------------------------------- ETH-001/002 -------- */
 static int mdio_read(uint32_t dev, uint32_t reg, uint32_t *val)
@@ -261,7 +261,7 @@ static tfw_result_t eth_phy_registers(struct tfw_out *o)
 }
 
 /* -------------------------------------------------- ETH-006/007/008 ---- */
-#include "net_lwip.h"   /* LwIP runtime (ETH-007/008, section 11) */
+#include "services/net_lwip.h"   /* LwIP runtime (ETH-007/008, section 11) */
 
 static tfw_result_t eth_autoneg_link(struct tfw_out *o)
 {

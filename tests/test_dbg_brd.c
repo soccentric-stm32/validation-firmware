@@ -12,8 +12,8 @@
 #include "task.h"
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "test_core.h"
-#include "cli.h"
+#include "app/test_core.h"
+#include "app/cli.h"
 
 /* -------------------------------------------------- DBG-001/002/003 --- */
 static volatile uint32_t s_dwt_var, s_dbgmon_hits;

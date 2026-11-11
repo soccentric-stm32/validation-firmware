@@ -11,8 +11,8 @@
 
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "clock.h"
-#include "link.h"
+#include "bsp/clock.h"
+#include "protocol/link.h"
 
 void hwval_clock_init(void)
 {

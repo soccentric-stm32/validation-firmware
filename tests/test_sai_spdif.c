@@ -26,8 +26,8 @@
 #include "stm32f7xx_hal_sai.h"   /* SAI_SPDIF/AC97/ULAW protocol aliases */
 #include "hwval_board.h"
 #include "hwval_board_pins.h"
-#include "test_core.h"
-#include "harness.h"
+#include "app/test_core.h"
+#include "app/harness.h"
 
 /* RM0410: DMA2 requests 0..3 = SAI1 A_RX, A_TX, B_RX, B_TX. */
 #define SAI1_A_TX_STREAM DMA2_Stream1

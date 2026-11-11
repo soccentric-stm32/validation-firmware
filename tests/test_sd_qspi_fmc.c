@@ -13,7 +13,7 @@
 #include "task.h"
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "test_core.h"
+#include "app/test_core.h"
 
 /* ----------------------------------------------------------- SD-001 ---- */
 static tfw_result_t sd_registers(struct tfw_out *o)

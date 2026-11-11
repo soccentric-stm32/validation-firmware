@@ -32,7 +32,7 @@
 #include "lwip/inet_chksum.h"
 #include "lwip/ip4_addr.h"
 #include "netif/ethernet.h"
-#include "net_lwip.h"
+#include "services/net_lwip.h"
 
 #ifndef ETH_RX_BUF_SIZE
 #define ETH_RX_BUF_SIZE 1524U                   /* one max frame per buf  */

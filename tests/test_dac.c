@@ -13,8 +13,8 @@
 #include "task.h"
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "test_core.h"
-#include "harness.h"
+#include "app/test_core.h"
+#include "app/harness.h"
 
 static void dac_clk(void) { __HAL_RCC_DAC_CLK_ENABLE(); }
 

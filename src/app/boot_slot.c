@@ -18,10 +18,10 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "stm32f7xx_hal.h"
-#include "boot_slot.h"
-#include "fault.h"
-#include "uart3.h"
-#include "debug_uart.h"
+#include "app/boot_slot.h"
+#include "services/fault.h"
+#include "bsp/uart3.h"
+#include "bsp/debug_uart.h"
 
 /* RTC_BKP2R hand-over record (HND-003): bits 0..23 magic "HND", 24..25
  * slot, 26 trial pending, 27..28 trial counter. */

@@ -18,7 +18,7 @@
 #include "task.h"
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "test_core.h"
+#include "app/test_core.h"
 
 /* linker-provided block boundaries */
 extern uint32_t _sdata, _edata, _sbss, _ebss, _estack;

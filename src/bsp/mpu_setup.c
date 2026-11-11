@@ -11,7 +11,7 @@
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
 #include "hwval_sections.h"
-#include "mpu_setup.h"
+#include "bsp/mpu_setup.h"
 
 /* Symbols exported by the linker script. */
 extern uint32_t __noncacheable_start;

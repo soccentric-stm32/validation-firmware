@@ -12,7 +12,7 @@
 
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "uart3.h"
+#include "bsp/uart3.h"
 #include "FreeRTOS.h"
 #include "task.h"
 

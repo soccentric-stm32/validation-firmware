@@ -14,8 +14,8 @@
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
 #include "hwval_board_pins.h"
-#include "test_core.h"
-#include "harness.h"
+#include "app/test_core.h"
+#include "app/harness.h"
 
 struct spi_def {
     SPI_TypeDef *s;

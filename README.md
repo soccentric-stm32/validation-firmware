@@ -22,7 +22,7 @@ HWVAL is a FreeRTOS firmware that tests every usable hardware block of the NUCLE
 - Coverage gate: every requirement has a test and every peripheral is listed
 - Strict cppcheck and `-Wall -Wextra -Werror`
 - Generated test catalogue and a full user guide
-- Measured board reference in `Hardware.md`
+- Measured board reference in [`docs/Hardware.md`](docs/Hardware.md)
 - Reproducible Docker build environment
 
 ## Build and run
@@ -32,6 +32,34 @@ scripts/build.sh                             # build inside the stm32-dev contai
 scripts/docker-dev.sh flash build/hwval.elf  # flash over SWD
 scripts/docker-dev.sh serial                 # open the console at 115200 8N1
 python3 scripts/hwtest.py                    # run tests and write a report
+```
+
+## Documentation
+
+| Document | Contents |
+|---|---|
+| [docs/SRS.md](docs/SRS.md) | Software requirements specification (SRS-HWVAL-F767) |
+| [docs/Hardware.md](docs/Hardware.md) | Measured NUCLEO-F767ZI board reference |
+| [docs/TEST_CATALOGUE.md](docs/TEST_CATALOGUE.md) | Generated catalogue of every test case |
+| [docker/README.md](docker/README.md) | Build container, flashing and debugging |
+
+## Project layout
+
+```
+board/            Board support: pin map, HAL/FreeRTOS/LwIP config, LwIP arch port
+src/app/          Entry point, CLI, test framework, settings, version, boot contract
+src/bsp/          Clock, UART, watchdog, MPU/cache, flash and syscall drivers
+src/services/     Fault handling, FreeRTOS glue and the LwIP wrapper
+src/protocol/     HWLINK framing, GUI link mode and flatcc arena hooks
+src/generated/    Committed flatcc headers generated from protocol/hwlink.fbs
+tests/            On-target test cases, one file per hardware block
+protocol/         HWLINK FlatBuffers schema (single source of truth)
+ld/               Linker scripts (flash sectors, section placement)
+scripts/          Build, flash, host test and gate scripts
+ci/               Release and packaging helpers used by the Jenkinsfile
+docker/           Reproducible STM32 build/flash/debug container
+docs/             SRS, board reference and generated test catalogue
+third_party/      Vendored dependencies (flatcc)
 ```
 
 ## Related projects

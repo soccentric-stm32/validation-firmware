@@ -16,9 +16,9 @@
 #include "hwval_board.h"
 #include "hwval_board_pins.h"
 #include "hwval_limits.h"
-#include "test_core.h"
-#include "harness.h"
-#include "debug_uart.h"
+#include "app/test_core.h"
+#include "app/harness.h"
+#include "bsp/debug_uart.h"
 
 struct uart_def {
     USART_TypeDef *u;

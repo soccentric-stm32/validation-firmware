@@ -12,8 +12,8 @@
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
 #include "hwval_limits.h"
-#include "test_core.h"
-#include "version.h"
+#include "app/test_core.h"
+#include "app/version.h"
 
 #define DBGMCU_IDCODE_ADDR 0xE0042000U
 #define UID_ADDR           0x1FF0F420U

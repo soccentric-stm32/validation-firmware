@@ -16,8 +16,8 @@
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
 #include "hwval_board_pins.h"
-#include "test_core.h"
-#include "harness.h"
+#include "app/test_core.h"
+#include "app/harness.h"
 
 static GPIO_TypeDef *const s_ports[9] = {
     GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, GPIOG, NULL, GPIOH,

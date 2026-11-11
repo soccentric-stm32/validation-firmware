@@ -15,11 +15,11 @@
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
 #include "hwval_board_pins.h"
-#include "test_core.h"
-#include "fault.h"
-#include "flash_ops.h"
-#include "settings.h"
-#include "cli.h"
+#include "app/test_core.h"
+#include "services/fault.h"
+#include "bsp/flash_ops.h"
+#include "app/settings.h"
+#include "app/cli.h"
 
 /* -------------------------------------------------- SAFE-001/003 ------ */
 static tfw_result_t safe_optbytes_untouched(struct tfw_out *o)

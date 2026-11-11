@@ -14,9 +14,9 @@
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
 #include "hwval_board_pins.h"
-#include "test_core.h"
-#include "harness.h"
-#include "fault.h"
+#include "app/test_core.h"
+#include "app/harness.h"
+#include "services/fault.h"
 
 /* ------------------------------------------------- INT-001 (NVIC scan) -- */
 #define HWVAL_IRQ_MAX 91

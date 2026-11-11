@@ -15,8 +15,8 @@
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
 #include "hwval_limits.h"
-#include "test_core.h"
-#include "fault.h"
+#include "app/test_core.h"
+#include "services/fault.h"
 
 /* ------------------------------------------------------------------ 001 */
 static tfw_result_t core_integer_ops(struct tfw_out *o)

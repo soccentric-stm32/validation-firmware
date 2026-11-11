@@ -14,9 +14,9 @@
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
 #include "hwval_limits.h"
-#include "test_core.h"
-#include "harness.h"
-#include "cli.h"
+#include "app/test_core.h"
+#include "app/harness.h"
+#include "app/cli.h"
 
 static void rtc_unlock(void)
 {

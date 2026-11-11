@@ -17,13 +17,13 @@
 #include "semphr.h"
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "test_core.h"
-#include "uart3.h"
-#include "settings.h"
+#include "app/test_core.h"
+#include "bsp/uart3.h"
+#include "app/settings.h"
 #include "hwval_sections.h"
-#include "cli.h"
-#include "version.h"
-#include "debug_uart.h"
+#include "app/cli.h"
+#include "app/version.h"
+#include "bsp/debug_uart.h"
 
 #define HWVAL_MAX_TESTS 256
 #define PERSIST_MAGIC   0x48565202U /* "HVR" v2 */

@@ -12,8 +12,8 @@
 #include "task.h"
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "test_core.h"
-#include "fault.h"
+#include "app/test_core.h"
+#include "services/fault.h"
 
 /* ------------------------------------------------------------- CACHE-001 */
 static tfw_result_t cache_icache_ops(struct tfw_out *o)
@@ -317,6 +317,37 @@ static tfw_result_t mpu_subregion_privdef(struct tfw_out *o)
     return res;
 }
 
+/* MPU-004 helpers: a temporary region readable by unprivileged code. */
+static void mpu_unpriv_window(uint8_t number, uint32_t base, uint8_t size,
+                              uint8_t access, int executable)
+{
+    MPU_Region_InitTypeDef r = { 0 };
+
+    r.Number           = number;
+    r.BaseAddress      = base;
+    r.Size             = size;
+    r.Enable           = MPU_REGION_ENABLE;
+    r.AccessPermission = access;
+    r.IsBufferable     = MPU_ACCESS_NOT_BUFFERABLE;
+    r.IsCacheable      = MPU_ACCESS_CACHEABLE;
+    r.IsShareable      = MPU_ACCESS_NOT_SHAREABLE;
+    r.TypeExtField     = MPU_TEX_LEVEL0;
+    r.DisableExec      = (executable != 0) ? MPU_INSTRUCTION_ACCESS_ENABLE
+                                           : MPU_INSTRUCTION_ACCESS_DISABLE;
+    HAL_MPU_ConfigRegion(&r);
+}
+
+static void mpu_unpriv_window_off(uint8_t number)
+{
+    MPU_Region_InitTypeDef r = { 0 };
+
+    r.Number = number;
+    r.Enable = MPU_REGION_DISABLE;
+    HAL_MPU_ConfigRegion(&r);
+    __DSB();
+    __ISB();
+}
+
 /* MPU-001 + MPU-004: type report + unprivileged probe via CONTROL. */
 static tfw_result_t mpu_type_unpriv(struct tfw_out *o)
 {
@@ -327,15 +358,31 @@ static tfw_result_t mpu_type_unpriv(struct tfw_out *o)
     uint32_t exc, probe;
 
     /* MPU-004: set nPRIV (thread mode unprivileged), try to write flash
-     * sector 11 (MPU region 2 = PRIV_RW). Handler mode stays privileged,
-     * so the recovery path restores CONTROL afterwards. */
+     * sector 11 (MPU region 2 = PRIV_RW).  The background map is
+     * privileged-only, so unprivileged code can neither fetch from flash nor
+     * touch its own stack; two temporary regions (higher numbers win) give
+     * unprivileged read/execute on the image bank and read/write on DTCM,
+     * and leave sector 11 privileged-only.  The fault handler clears nPRIV
+     * on the recovery path (only privileged code can).  BASEPRI keeps the
+     * RTOS from switching tasks while CONTROL is unprivileged; MemManage
+     * stays unmasked. */
+    mpu_unpriv_window(MPU_REGION_NUMBER5, 0x08000000U, MPU_REGION_SIZE_1MB,
+                      MPU_REGION_PRIV_RO_URO, 1);
+    mpu_unpriv_window(MPU_REGION_NUMBER6, 0x20000000U, MPU_REGION_SIZE_128KB,
+                      MPU_REGION_FULL_ACCESS, 0);
+    __DSB();
+    __ISB();
+    __set_BASEPRI(0x10U);
     __set_CONTROL(__get_CONTROL() | CONTROL_nPRIV_Msk);
     __ISB();
     /* cppcheck-suppress assignBoolToPointer */ MPU_PROBE_ARM(unpf);
     *(volatile uint32_t *)HWVAL_SECTOR11_BASE = 0U;
     MPU_PROBE_OK(unpf);
-    __set_CONTROL(__get_CONTROL() & ~CONTROL_nPRIV_Msk);
+    __set_CONTROL(__get_CONTROL() & ~CONTROL_nPRIV_Msk); /* no-op if recovered */
     __ISB();
+    __set_BASEPRI(0U);
+    mpu_unpriv_window_off(MPU_REGION_NUMBER5);
+    mpu_unpriv_window_off(MPU_REGION_NUMBER6);
     if (mpu_faulted(&exc, &probe) == 0) {
         /* with the background map ON, background is privileged-only, and
          * region 2 is PRIV_RW: the unprivileged write must fault */

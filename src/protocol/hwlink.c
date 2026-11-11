@@ -12,8 +12,8 @@
  */
 
 #include <string.h>
-#include "hwlink.h"
-#include "test_core.h"
+#include "protocol/hwlink.h"
+#include "app/test_core.h"
 
 #define HWLINK_HEADER_SIZE   4U
 #define HWLINK_CRC_SIZE      4U

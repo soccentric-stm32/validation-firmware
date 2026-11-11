@@ -19,7 +19,7 @@
 #include "stream_buffer.h"
 #include "message_buffer.h"
 #include "stm32f7xx_hal.h"
-#include "test_core.h"
+#include "app/test_core.h"
 
 /* reason helper: first failure wins */
 /* failure reason helper: hwval_fail() from the framework (TFW-004) */

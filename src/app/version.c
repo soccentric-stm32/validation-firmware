@@ -8,8 +8,8 @@
  */
 
 #include <stdio.h>
-#include "version.h"
-#include "uart3.h"
+#include "app/version.h"
+#include "bsp/uart3.h"
 
 #ifndef HWVAL_VERSION_STR
 #define HWVAL_VERSION_STR "unknown"

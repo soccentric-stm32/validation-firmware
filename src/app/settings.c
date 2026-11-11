@@ -7,8 +7,8 @@
  *          GEN-008 (fault action default halt, settable)
  */
 
-#include "settings.h"
-#include "fault.h"
+#include "app/settings.h"
+#include "services/fault.h"
 
 hwval_settings_t g_set = {
     .mode = HWVAL_MODE_INTERACTIVE,

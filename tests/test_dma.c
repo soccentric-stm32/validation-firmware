@@ -12,8 +12,8 @@
 #include "task.h"
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "test_core.h"
-#include "fault.h"
+#include "app/test_core.h"
+#include "services/fault.h"
 #include "hwval_sections.h"
 
 extern uint8_t hwval_itcm_base[]; /* linker symbol */

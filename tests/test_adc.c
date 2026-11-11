@@ -15,9 +15,9 @@
 #include "hwval_board.h"
 #include "hwval_board_pins.h"
 #include "hwval_limits.h"
-#include "test_core.h"
-#include "harness.h"
-#include "fault.h"
+#include "app/test_core.h"
+#include "app/harness.h"
+#include "services/fault.h"
 #include "hwval_sections.h"
 
 #define ADC1_BASE_A 0x40012000U

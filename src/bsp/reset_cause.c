@@ -9,8 +9,8 @@
 #include <stdio.h>
 #include "stm32f7xx_hal.h"
 #include "hwval_board.h"
-#include "reset_cause.h"
-#include "uart3.h"
+#include "bsp/reset_cause.h"
+#include "bsp/uart3.h"
 
 static uint32_t s_flags_at_boot; /* snapshot for TFW-007 post-reset checks */
 

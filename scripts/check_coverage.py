@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SRS = ROOT / "SRS.md"
+SRS = ROOT / "docs" / "SRS.md"
 CMAKELISTS = ROOT / "CMakeLists.txt"
 
 # ---------------------------------------------------------------- SRS part
