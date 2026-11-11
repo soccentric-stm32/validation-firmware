@@ -104,9 +104,13 @@ static tfw_result_t cache_write_attributes(struct tfw_out *o)
     SCB_CleanInvalidateDCache_by_Addr((uint32_t *)addr, 64);
     for (int i = 0; i < 16; i++) { mem[i] = 0U; }
     SCB_CleanInvalidateDCache(); /* whole cache: attribute-agnostic check */
-    if (*(volatile uint32_t *)addr != 0x11110000U) {
-        hwval_fail(o, "clean+invalidate lost the earlier data");
-        return TFW_FAIL;
+    /* Clean writes the newest (zero) data back before the invalidate drops
+     * the lines, so memory must hold the zeros, not the earlier pattern. */
+    for (int i = 0; i < 16; i++) {
+        if (mem[i] != 0U) {
+            hwval_fail(o, "clean+invalidate lost the latest data (word %d)", i);
+            return TFW_FAIL;
+        }
     }
     hwval_meas(o, "clean by addr + whole ok");
     hwval_lim(o, "write-through/back coherent via clean path (MPU attrs)");

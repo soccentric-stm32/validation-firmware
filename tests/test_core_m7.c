@@ -29,7 +29,7 @@ static tfw_result_t core_integer_ops(struct tfw_out *o)
     __asm volatile ("sdiv %0, %1, %2" : "=r"(r_sdiv) : "r"(-1000), "r"(7));
     r_clz   = __CLZ(0x00001000U);
     __asm volatile ("qadd8 %0, %1, %2" : "=r"(r_qadd8)
-                    : "r"(0x02010100U), "r"(0xFF0103FFU));
+                    : "r"(0x807F0100U), "r"(0xFF0103FFU));
     __asm volatile ("smlad  %0, %1, %2, %3" : "=r"(r_smlad)
                     : "r"(0x00020003U), "r"(0x00040005U), "r"(0U));
     r_bfi = 0U;
@@ -41,13 +41,14 @@ static tfw_result_t core_integer_ops(struct tfw_out *o)
     hwval_meas(o, "udiv=%lu sdiv=%ld clz=%lu qadd8=%08lX smlad=%ld",
                (unsigned long)r_udiv, (long)r_sdiv, (unsigned long)r_clz,
                (unsigned long)r_qadd8, (long)r_smlad);
-    hwval_lim(o, "udiv 333 sdiv -142 clz 19 qadd8 FF0403FF smlad 23 ubfx F");
+    hwval_lim(o, "udiv 333 sdiv -142 clz 19 qadd8 807F04FF smlad 23 ubfx F");
 
     if (r_udiv != 333U)                            { fails++; }
     if (r_sdiv != -142)                            { fails++; }
     if (r_clz != 19U)                              { fails++; }
-    /* saturating byte adds: 00+FF=FF, 01+03=04, 02+01=03, FF+01=FF sat */
-    if (r_qadd8 != 0xFF0403FFU)                    { fails++; }
+    /* signed saturating byte adds, lane 0 first: 0+(-1)=FF, 1+3=04,
+     * 127+1 saturates to 7F, -128+(-1) saturates to 80 */
+    if (r_qadd8 != 0x807F04FFU)                    { fails++; }
     if (r_smlad != (2 * 4 + 3 * 5))                { fails++; }
     if ((r_bfi & 0xFF00U) != 0xA500U)              { fails++; }
     if (r_ubfx != 0xFU)                            { fails++; }
@@ -66,41 +67,41 @@ static uint64_t f64_bits(double d)
 
 static tfw_result_t core_fpu(struct tfw_out *o)
 {
-    int fails = 0;
+    unsigned fails = 0U;  /* bit n set = sub-check n wrong */
     uint32_t fpscr;
     float  a = 1.5f, b = 0.25f;
     double x = 65504.0, y = 4.0;
 
     __asm volatile ("vmrs %0, fpscr" : "=r"(fpscr));
 
-    if (f32_bits(a + b)    != 0x3FC00000U) fails++; /* 1.75   */
-    if (f32_bits(a / b)    != 0x41000000U) fails++; /* 6.0    */
+    if (f32_bits(a + b)    != 0x3FE00000U) fails |= 1 << 0; /* 1.75   */
+    if (f32_bits(a / b)    != 0x40C00000U) fails |= 1 << 1; /* 6.0    */
     if (f32_bits(__builtin_sqrtf(2.0f)) != f32_bits(1.4142135381698608f))
-        fails++;
+        fails |= 1 << 2;
     /* fused: fma(a,b,+1)=1.375 exact in single */
-    if (f32_bits(__builtin_fmaf(1.5f, 0.25f, 1.0f)) != 0x3FB00000U) fails++;
+    if (f32_bits(__builtin_fmaf(1.5f, 0.25f, 1.0f)) != 0x3FB00000U) fails |= 1 << 3;
     /* infinity and NaN handling */
     float inf  = a / 0.0f;
     float zero = 0.0f;
-    if (f32_bits(inf)               != 0x7F800000U) fails++; /* +inf   */
-    if (f32_bits(inf * zero)        != 0x7FC00000U) fails++; /* NaN    */
+    if (f32_bits(inf)               != 0x7F800000U) fails |= 1 << 4; /* +inf   */
+    if (f32_bits(inf * zero)        != 0x7FC00000U) fails |= 1 << 5; /* NaN    */
     /* smallest denormal stays denormal (FZ=0 on M7 default) */
     float den = 1.401298464324817e-45f; /* 0x00000001, min denormal */
-    if (f32_bits(den) != 0x00000001U) fails++;
-    if (f32_bits(den * 2.0f) != 0x00000002U) fails++; /* stays denormal */
+    if (f32_bits(den) != 0x00000001U) fails |= 1 << 6;
+    if (f32_bits(den * 2.0f) != 0x00000002U) fails |= 1 << 7; /* stays denormal */
     /* double precision */
-    if (f64_bits(x * y) != f64_bits(262016.0)) fails++;
-    if (f64_bits(x / 2.0) != f64_bits(32752.0)) fails++;
+    if (f64_bits(x * y) != f64_bits(262016.0)) fails |= 1 << 8;
+    if (f64_bits(x / 2.0) != f64_bits(32752.0)) fails |= 1 << 9;
     double d2 = __builtin_sqrt(2.0);
-    if (f64_bits(d2) != f64_bits(1.4142135623730951)) fails++;
+    if (f64_bits(d2) != f64_bits(1.4142135623730951)) fails |= 1 << 10;
     int up = (int)(2.9), dn = (int)(-2.9);
-    if ((up != 2) || (dn != -2)) fails++; /* conversions truncate */
+    if ((up != 2) || (dn != -2)) fails |= 1 << 11; /* conversions truncate */
 
-    hwval_meas(o, "fpscr=%08lX inf=%08lX nan=1", (unsigned long)fpscr,
-               (unsigned long)f32_bits(inf));
+    hwval_meas(o, "fpscr=%08lX inf=%08lX bad=%03lX", (unsigned long)fpscr,
+               (unsigned long)f32_bits(inf), (unsigned long)fails);
     hwval_lim(o, "IEEE-754 SP+DP exact results, FZ=0 (denormals kept)");
     if (fails != 0) {
-        hwval_fail(o, "%d FPU checks wrong", fails);
+        hwval_fail(o, "FPU sub-checks wrong: mask %03lX", (unsigned long)fails);
         return TFW_FAIL;
     }
     return TFW_PASS;
@@ -437,21 +438,34 @@ static tfw_result_t core_wfi_wfe(struct tfw_out *o)
 
     __HAL_RCC_TIM2_CLK_ENABLE();
     TIM2->CR1 = 0U;
-    TIM2->PSC = (HAL_RCC_GetHCLKFreq() / 1000000U) - 1U; /* 1 MHz */
+    /* TIM2 runs from the APB1 timer clock: twice PCLK1 when APB1 is divided. */
+    uint32_t tim_clk = HAL_RCC_GetPCLK1Freq();
+    if (HAL_RCC_GetHCLKFreq() != tim_clk) {
+        tim_clk *= 2U;
+    }
+    TIM2->PSC = (tim_clk / 1000000U) - 1U; /* 1 MHz */
     TIM2->ARR = 0xFFFFFFFFU;
     TIM2->EGR = TIM_EGR_UG;
     TIM2->CR1 = TIM_CR1_CEN;
 
-    /* WFI: the 1 kHz SysTick interrupt wakes it (no masking). */
+    /* WFI sleeps until an interrupt.  Other interrupts (UART traffic from
+     * the host link) can wake it early, so sleep until the 1 kHz tick has
+     * advanced: from a tick edge that takes one tick period however many
+     * early wake-ups happen on the way. */
+    uint32_t tick = HAL_GetTick();
+    while (HAL_GetTick() == tick) { /* align to a tick edge */ }
+    tick = HAL_GetTick();
     t0 = TIM2->CNT;
-    __SEV(); /* clear stale event so WFI really sleeps */
+    __SEV(); /* clear stale event so WFE/WFI really sleeps */
     __WFE();
-    __WFI();
+    while (HAL_GetTick() == tick) {
+        __WFI();
+    }
     t1 = TIM2->CNT;
     uint32_t dt = t1 - t0;
     hwval_meas(o, "wfi woke after %lu us", (unsigned long)dt);
-    hwval_lim(o, "1 tick (1 ms) + jitter < 3 ms");
-    if ((dt < 100U) || (dt > 3000U)) {
+    hwval_lim(o, "1 tick (1 ms) + jitter, 0.5..3 ms");
+    if ((dt < 500U) || (dt > 3000U)) {
         TIM2->CR1 = 0U;
         hwval_fail(o, "WFI window %lu us wrong", (unsigned long)dt);
         return TFW_FAIL;
