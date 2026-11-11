@@ -50,7 +50,7 @@ DEV        := scripts/docker-dev.sh
 PYTHON     ?= python3
 BOOTLOADER ?= $(patsubst %/tools/bootctl.py,%,$(firstword $(wildcard ../bootloader/tools/bootctl.py ../../bootloader/bootloader/tools/bootctl.py) ../bootloader/tools/bootctl.py))
 SIGN_KEY   ?= $(BOOTLOADER)/keys/dev-signing-key.pem
-SECURITY_COUNTER ?= 2
+SECURITY_COUNTER ?= 3
 PORT       ?=
 OPENOCD    := openocd -f board/st_nucleo_f7.cfg
 
