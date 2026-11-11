@@ -2,6 +2,8 @@
 
 HWVAL is a FreeRTOS firmware that tests every usable hardware block of the NUCLEO-F767ZI board and its STM32F767ZI MCU. It is driven from a terminal over the ST-LINK virtual COM port, from a Python script for automated runs, or from the HWVAL Studio desktop GUI through the binary HWLINK link mode. Each test is traced to a requirement, results are reported as JSON and Markdown, and build gates check the memory footprint, requirement coverage and static analysis. Use it for board bring-up, design validation and as the end-of-line test image on the production line.
 
+[![The validation firmware running on the board](https://raw.githubusercontent.com/soccentric-stm32/soccentric-stm32.github.io/main/assets/shots/term-validation.webp)](https://soccentric-stm32.github.io/#validation)
+
 ## Features
 
 - Tests every usable peripheral of the STM32F767ZI and the NUCLEO board
