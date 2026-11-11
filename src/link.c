@@ -1552,6 +1552,8 @@ void hwval_link_run(void)
     while (s_text_requested == 0) {
         int c = hwval_uart3_getc();
 
+        hwval_task_report(HWVAL_TASK_CLI);
+
         if (c >= 0) {
             uint32_t now = (uint32_t)xTaskGetTickCount();
             last_rx = now;

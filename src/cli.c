@@ -865,6 +865,7 @@ void hwval_cli_task(void *arg)
     for (;;) {
         int c;
 
+        hwval_task_report(HWVAL_TASK_CLI);
         if (g_set.mode == HWVAL_MODE_LINK) {
             hwval_link_run();
             editor_reset();

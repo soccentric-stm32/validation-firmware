@@ -129,10 +129,10 @@ void hwval_rtos_start(void)
     if (xTaskCreate(task_runner, "runner", 4096, NULL, 2, NULL) != pdPASS) {
         configASSERT(!"create runner");
     }
-    if (xTaskCreate(task_heartbeat, "hb", 256, NULL, 1, NULL) != pdPASS) {
+    if (xTaskCreate(task_heartbeat, "hb", 512, NULL, 1, NULL) != pdPASS) {
         configASSERT(!"create hb");
     }
-    if (xTaskCreate(task_watchdog, "wdg", 256, NULL, 1, NULL) != pdPASS) {
+    if (xTaskCreate(task_watchdog, "wdg", 512, NULL, 1, NULL) != pdPASS) {
         configASSERT(!"create wdg");
     }
     if (hwval_dbg_task_create() != 0) {   /* DUART-002 */
@@ -154,13 +154,15 @@ static void task_runner(void *arg)
 {
     (void)arg;
     while (hwval_boot_trial_pending()) {
+        hwval_task_report(HWVAL_TASK_RUNNER);
         vTaskDelay(pdMS_TO_TICKS(100));
     }
     if (g_set.mode != HWVAL_MODE_LINK) {
         hwval_test_all();
     }
     for (;;) {
-        (void)hwval_test_runner_poll(10000U);
+        hwval_task_report(HWVAL_TASK_RUNNER);
+        (void)hwval_test_runner_poll(1000U);
     }
 }
 
@@ -178,6 +180,7 @@ static void task_heartbeat(void *arg)
 
     for (;;) {
         const uint32_t period = hwval_test_running() ? 100U : 500U;
+        hwval_task_report(HWVAL_TASK_HB);
         HAL_GPIO_TogglePin(HWVAL_LED1_PORT, HWVAL_LED1_PIN);
         HAL_GPIO_WritePin(HWVAL_LED3_PORT, HWVAL_LED3_PIN,
                           hwval_test_failed() ? GPIO_PIN_SET : GPIO_PIN_RESET);
@@ -196,6 +199,7 @@ static void task_watchdog(void *arg)
     const TickType_t period = pdMS_TO_TICKS(500);
 
     for (;;) {
+        hwval_task_report(HWVAL_TASK_WDG);
         hwval_boot_health_poll();
         if (!hwval_test_runner_progress_expired() && !hwval_boot_stop_kick()) {
             hwval_iwdg_kick();

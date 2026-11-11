@@ -45,4 +45,15 @@ void hwval_dbg_resume(void);
  * that reset the MCU on purpose. */
 void hwval_dbg_flush(uint32_t timeout_ms);
 
+/* Task numbers for hwval_task_report(). */
+#define HWVAL_TASK_CLI    1U
+#define HWVAL_TASK_RUNNER 2U
+#define HWVAL_TASK_HB     3U
+#define HWVAL_TASK_WDG    4U
+
+/* Once-a-second "task <n> <name>: <purpose>" line for one of the four
+ * application tasks.  Each task calls it from its loop; it returns at once
+ * unless a second has passed since that task last printed. */
+void hwval_task_report(unsigned number);
+
 #endif /* HWVAL_DEBUG_UART_H */

@@ -102,6 +102,35 @@ static void task_dbg(void *arg)
     }
 }
 
+/* Once-a-second status line per application task. */
+static const struct {
+    const char *name;
+    const char *purpose;
+} s_task_info[4] = {
+    {"cli", "text CLI and HWLINK on USART3, runs commands from the host"},
+    {"runner", "runs the boot test suite, then jobs from the CLI or link"},
+    {"hb", "heartbeat: LD1 1 Hz idle, 5 Hz while testing, LD3 on failure"},
+    {"wdg", "kicks the IWDG while the runner shows progress, BOOT health"},
+};
+static uint32_t s_task_last[4];
+static uint8_t s_task_primed[4];
+
+void hwval_task_report(unsigned number)
+{
+    if ((number < 1U) || (number > 4U)) {
+        return;
+    }
+    const unsigned i = number - 1U;
+    const uint32_t now = HAL_GetTick();
+    if ((s_task_primed[i] != 0U) && ((now - s_task_last[i]) < 1000U)) {
+        return;
+    }
+    s_task_primed[i] = 1U;
+    s_task_last[i] = now;
+    hwval_dbg('I', "task %u %s: %s", number, s_task_info[i].name,
+              s_task_info[i].purpose);
+}
+
 int hwval_dbg_task_create(void)
 {
     return (xTaskCreate(task_dbg, "dbg", DBG_TASK_STACK, NULL,

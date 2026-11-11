@@ -188,6 +188,10 @@ uint32_t hwval_fault_enter(const hwval_fault_frame_t *frame, uint32_t lr,
         ((hwval_fault_frame_t *)(uintptr_t)frame)->pc =
             (uint32_t)(uintptr_t)hwval_fault_recover_pc;
         hwval_fault_recover = 0;
+        /* A test may fault from unprivileged thread mode (MPU-004).  Only
+         * privileged code can clear nPRIV, so do it here, in the handler. */
+        __set_CONTROL(__get_CONTROL() & ~CONTROL_nPRIV_Msk);
+        __ISB();
         return lr;
     }
     fault_common(exc, frame, lr);
