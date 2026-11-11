@@ -90,8 +90,10 @@ add_compile_definitions(
     HWVAL_CUBE_VERSION="${HWVAL_CUBE_VERSION}"
     HWVAL_BUILD_DATE="${HWVAL_BUILD_DATE} ${HWVAL_COMMIT_DATE}")
 
-# FreeRTOS heap size, configurable at build time (FRT-006).
-set(HWVAL_HEAP_KB "32" CACHE STRING "FreeRTOS heap_4 size in KB (FRT-006)")
+# FreeRTOS heap size, configurable at build time (FRT-006).  The four tasks and
+# their log buffers leave 3.5 KB of a 32 KB heap, below the 4 KB the BOOT health
+# check requires, so every trial boot failed; 40 KB leaves about 11 KB free.
+set(HWVAL_HEAP_KB "40" CACHE STRING "FreeRTOS heap_4 size in KB (FRT-006)")
 math(EXPR HWVAL_HEAP_BYTES "${HWVAL_HEAP_KB} * 1024")
 
 include_directories(src board tests

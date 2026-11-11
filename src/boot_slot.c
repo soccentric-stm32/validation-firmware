@@ -220,9 +220,16 @@ void hwval_boot_health_poll(void)
         s_health = HWVAL_HEALTH_PASSED;
         hwval_dbg('I', "health: passed, CONFIRMED written");
     } else if (now >= HEALTH_STOP_KICK_MS) {
+        const hwval_fault_record_t *r = hwval_fault_record();
+        unsigned new_faults = (r->magic == 0x4856464CU)
+                                  ? (unsigned)(r->count - s_fault_count_at_boot) : 0U;
+
         s_health = HWVAL_HEALTH_FAILED;
-        hwval_dbg('E', "health: not healthy by %u ms, trial fails",
-                  (unsigned)HEALTH_STOP_KICK_MS);
+        hwval_dbg('E', "health: not healthy by %u ms, trial fails "
+                  "(new faults %u, free heap %u, uart3 ready %u)",
+                  (unsigned)HEALTH_STOP_KICK_MS, new_faults,
+                  (unsigned)xPortGetFreeHeapSize(),
+                  (unsigned)hwval_uart3_ready());
     }
 }
 
