@@ -484,6 +484,11 @@ void hwval_link_boot_init(void)
         s_answer_q = xQueueCreate(LINK_ANSWER_QUEUE_LEN,
                                   sizeof(struct link_answer));
     }
+    /* The builder's emitter and allocator are set here; without this the
+     * first reply calls a NULL emit function and HardFaults. */
+    if (flatcc_builder_init(&s_builder) != 0) {
+        hwval_fault_assert(__FILE__, __LINE__);
+    }
 
     bkp_unlock();
     s_boot_active = (RTC->BKP7R == LINK_BKP_MAGIC) ? 1 : 0;
