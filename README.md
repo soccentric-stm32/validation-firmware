@@ -6,6 +6,11 @@ HWVAL is a FreeRTOS firmware that tests every usable hardware block of the NUCLE
 
 The debug log from a reset on a NUCLEO-F767ZI (USART6, 115200 8N1), recorded from the board. [Watch it replay line by line](https://soccentric-stm32.github.io/#validation) on the project page.
 
+![Debug terminal output from a reset on a NUCLEO-F767ZI](docs/debug-terminal.svg)
+
+<details>
+<summary>Plain text</summary>
+
 ```console
 $ make flash PORT=/dev/ttyACM0
 Activate: ok, device is resetting
@@ -31,6 +36,8 @@ Activate: ok, device is resetting
 [   5502] HWVAL I task 4 wdg: kicks the IWDG while the runner shows progress, BOOT health
 [   6002] HWVAL I task 1 cli: text CLI and HWLINK on USART3, runs commands from the host
 ```
+
+</details>
 
 ## Features
 
